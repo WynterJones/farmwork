@@ -121,13 +121,13 @@ const STORYBOOK_QUESTIONS = [
 export async function init(options) {
   const cwd = process.cwd();
 
-  console.log(chalk.cyan("\n🌾 Farmwork Initialization\n"));
+  console.log(chalk.cyan("\n🌽 Farmwork Initialization\n"));
 
   const answers = await inquirer.prompt(QUESTIONS);
 
   // Ask Storybook deployment questions if Storybook is enabled
   if (answers.includeStorybook) {
-    console.log(chalk.cyan("\n📚 Storybook Deployment Configuration\n"));
+    console.log(chalk.cyan("\n🍇 Storybook Deployment Configuration\n"));
     console.log(
       chalk.gray(
         "We recommend deploying Storybook to Netlify with password protection.",
@@ -144,15 +144,115 @@ export async function init(options) {
 
     if (answers.passwordProtect) {
       console.log(
-        chalk.yellow(
-          "\n⚠️  Remember to enable password protection in Netlify:",
-        ),
+        chalk.yellow("\n🍋 Remember to enable password protection in Netlify:"),
       );
       console.log(
         chalk.gray("   Site settings → Access control → Password protection"),
       );
     }
   }
+
+  // Check for existing files that would be overwritten
+  const existingFiles = [];
+  const filesToCheck = [
+    {
+      path: path.join(cwd, "CLAUDE.md"),
+      name: "CLAUDE.md",
+      backup: "OLD_CLAUDE.md",
+    },
+    {
+      path: path.join(cwd, "justfile"),
+      name: "justfile",
+      backup: "OLD_justfile",
+    },
+    {
+      path: path.join(cwd, ".farmwork.json"),
+      name: ".farmwork.json",
+      backup: null,
+    },
+    {
+      path: path.join(cwd, ".claude", "settings.json"),
+      name: ".claude/settings.json",
+      backup: ".claude/OLD_settings.json",
+    },
+    {
+      path: path.join(cwd, ".claude", "commands"),
+      name: ".claude/commands/",
+      backup: null,
+      isDir: true,
+    },
+    {
+      path: path.join(cwd, ".claude", "agents"),
+      name: ".claude/agents/",
+      backup: null,
+      isDir: true,
+    },
+    {
+      path: path.join(cwd, "_AUDIT"),
+      name: "_AUDIT/",
+      backup: null,
+      isDir: true,
+    },
+  ];
+
+  for (const file of filesToCheck) {
+    if (fs.existsSync(file.path)) {
+      existingFiles.push(file);
+    }
+  }
+
+  let didBackupClaudeMd = false;
+
+  if (existingFiles.length > 0 && !options.force) {
+    console.log(chalk.yellow("\n🍋 The following files/folders already exist:"));
+    for (const file of existingFiles) {
+      if (file.isDir) {
+        console.log(chalk.gray(`   - ${file.name}`) + chalk.dim(" (will add new files)"));
+      } else if (file.backup) {
+        console.log(chalk.gray(`   - ${file.name}`) + chalk.dim(` (will backup to ${file.backup})`));
+      } else {
+        console.log(chalk.gray(`   - ${file.name}`) + chalk.dim(" (will overwrite)"));
+      }
+    }
+    console.log("");
+
+    const { overwriteChoice } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "overwriteChoice",
+        message: "How would you like to proceed?",
+        choices: [
+          {
+            name: "Continue (backup files, add to existing folders)",
+            value: "overwrite",
+          },
+          { name: "Cancel installation", value: "cancel" },
+        ],
+      },
+    ]);
+
+    if (overwriteChoice === "cancel") {
+      console.log(chalk.gray("\nInstallation cancelled."));
+      process.exit(0);
+    }
+
+    // Backup files that have backup paths
+    console.log("");
+    for (const file of existingFiles) {
+      if (file.backup) {
+        const backupPath = path.join(cwd, file.backup);
+        await fs.copy(file.path, backupPath);
+        console.log(chalk.gray(`   Backed up ${file.name} → ${file.backup}`));
+        if (file.name === "CLAUDE.md") {
+          didBackupClaudeMd = true;
+        }
+      }
+    }
+    console.log("");
+  }
+
+  // Store for use in final output
+  answers._didBackupClaudeMd = didBackupClaudeMd;
 
   const spinner = ora("Creating Farmwork structure...").start();
 
@@ -200,17 +300,17 @@ export async function init(options) {
           try {
             execSync("brew install just", { stdio: "inherit" });
             console.log(
-              chalk.green("\n✓ Just installed successfully via Homebrew"),
+              chalk.green("\n🌱 Just installed successfully via Homebrew"),
             );
           } catch {
             execSync("cargo install just", { stdio: "inherit" });
             console.log(
-              chalk.green("\n✓ Just installed successfully via Cargo"),
+              chalk.green("\n🌱 Just installed successfully via Cargo"),
             );
           }
         } catch {
           console.log(
-            chalk.yellow("\n⚠️  Could not install just automatically."),
+            chalk.yellow("\n🍋 Could not install just automatically."),
           );
           console.log(chalk.gray("   Install manually: brew install just"));
           console.log(chalk.gray("   Or see: https://github.com/casey/just"));
@@ -235,14 +335,14 @@ export async function init(options) {
         // Try npm first (most common)
         try {
           execSync("npm install -g @beads/bd", { stdio: "inherit" });
-          console.log(chalk.green("\n✓ Beads installed successfully via npm"));
+          console.log(chalk.green("\n🌱 Beads installed successfully via npm"));
           installed = true;
         } catch {
           // Try homebrew
           try {
             execSync("brew install steveyegge/beads/bd", { stdio: "inherit" });
             console.log(
-              chalk.green("\n✓ Beads installed successfully via Homebrew"),
+              chalk.green("\n🌱 Beads installed successfully via Homebrew"),
             );
             installed = true;
           } catch {
@@ -250,7 +350,7 @@ export async function init(options) {
             try {
               execSync("cargo install beads", { stdio: "inherit" });
               console.log(
-                chalk.green("\n✓ Beads installed successfully via Cargo"),
+                chalk.green("\n🌱 Beads installed successfully via Cargo"),
               );
               installed = true;
             } catch {
@@ -261,7 +361,7 @@ export async function init(options) {
 
         if (!installed) {
           console.log(
-            chalk.yellow("\n⚠️  Could not install beads automatically."),
+            chalk.yellow("\n🍋 Could not install beads automatically."),
           );
           console.log(
             chalk.gray("   Install manually: npm install -g @beads/bd"),
@@ -295,23 +395,23 @@ export async function init(options) {
     } catch (e) {
       console.log(
         chalk.yellow(
-          "\n⚠️  Could not set up beads. Install with: cargo install beads",
+          "\n🍋 Could not set up beads. Install with: cargo install beads",
         ),
       );
     }
 
     spinner.succeed(chalk.green("Farmwork initialized!"));
 
-    console.log(chalk.cyan("\n📁 Created structure:"));
-    console.log(`   ${chalk.green("✓")} _AUDIT/`);
-    console.log(`   ${chalk.green("✓")} _PLANS/`);
-    console.log(`   ${chalk.green("✓")} .claude/commands/`);
-    console.log(`   ${chalk.green("✓")} .claude/agents/`);
-    console.log(`   ${chalk.green("✓")} CLAUDE.md`);
-    console.log(`   ${chalk.green("✓")} justfile`);
-    console.log(`   ${chalk.green("✓")} .farmwork.json`);
+    console.log(chalk.cyan("\n🌱 Created structure:"));
+    console.log(`   ${chalk.green("🌱")} _AUDIT/`);
+    console.log(`   ${chalk.green("🌱")} _PLANS/`);
+    console.log(`   ${chalk.green("🌱")} .claude/commands/`);
+    console.log(`   ${chalk.green("🌱")} .claude/agents/`);
+    console.log(`   ${chalk.green("🌱")} CLAUDE.md`);
+    console.log(`   ${chalk.green("🌱")} justfile`);
+    console.log(`   ${chalk.green("🌱")} .farmwork.json`);
 
-    console.log(chalk.cyan("\n🚀 Next steps:"));
+    console.log(chalk.cyan("\n🥕 Next steps:"));
     console.log(
       `   1. Run ${chalk.yellow("just --list")} to see available commands`,
     );
@@ -321,6 +421,89 @@ export async function init(options) {
     console.log(
       `   3. Say ${chalk.yellow('"make a plan for <feature>"')} to start planning`,
     );
+
+    console.log(chalk.cyan("\n🌾 Now let Claude Code get comfortable!"));
+    console.log(chalk.gray("   Copy and paste this prompt to Claude Code:\n"));
+    console.log(
+      chalk.white(
+        "   ┌─────────────────────────────────────────────────────────────────────────┐",
+      ),
+    );
+    console.log(
+      chalk.white("   │") +
+        chalk.yellow(
+          " Hey Claude, I am using the Farmwork framework, please go through the    ",
+        ) +
+        chalk.white("│"),
+    );
+    console.log(
+      chalk.white("   │") +
+        chalk.yellow(
+          " justfile and create project-specific commands, and go through my app    ",
+        ) +
+        chalk.white("│"),
+    );
+    console.log(
+      chalk.white("   │") +
+        chalk.yellow(
+          " and suggest any project-specific subagents that would work well.        ",
+        ) +
+        chalk.white("│"),
+    );
+    console.log(
+      chalk.white(
+        "   └─────────────────────────────────────────────────────────────────────────┘",
+      ),
+    );
+
+    // Show merge prompt if we backed up CLAUDE.md
+    if (answers._didBackupClaudeMd) {
+      console.log(chalk.cyan("\n🥬 Merge your old instructions!"));
+      console.log(
+        chalk.gray(
+          "   Your old CLAUDE.md was backed up. Use this prompt to merge:\n",
+        ),
+      );
+      console.log(
+        chalk.white(
+          "   ┌─────────────────────────────────────────────────────────────────────────┐",
+        ),
+      );
+      console.log(
+        chalk.white("   │") +
+          chalk.yellow(
+            " Hey Claude, look at my CLAUDE.md file and merge the project-specific   ",
+          ) +
+          chalk.white("│"),
+      );
+      console.log(
+        chalk.white("   │") +
+          chalk.yellow(
+            " instructions from OLD_CLAUDE.md into it, so I have one file with all   ",
+          ) +
+          chalk.white("│"),
+      );
+      console.log(
+        chalk.white("   │") +
+          chalk.yellow(
+            " the Farmwork framework instructions plus my original project setup.    ",
+          ) +
+          chalk.white("│"),
+      );
+      console.log(
+        chalk.white("   │") +
+          chalk.yellow(
+            " Then delete OLD_CLAUDE.md when done. Same for OLD_justfile. Thank you.                                   ",
+          ) +
+          chalk.white("│"),
+      );
+      console.log(
+        chalk.white(
+          "   └─────────────────────────────────────────────────────────────────────────┘",
+        ),
+      );
+    }
+
     console.log("");
   } catch (error) {
     spinner.fail(chalk.red("Failed to initialize Farmwork"));
@@ -888,7 +1071,7 @@ Analyze staged changes and generate a concise commit message:
 Create the commit with footer:
 
 \`\`\`
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+🌽 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 \`\`\`

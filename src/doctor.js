@@ -190,15 +190,15 @@ export async function doctor() {
 
     for (const check of category.items) {
       if (check.passed) {
-        console.log(chalk.green(`  ✓ ${check.message}`));
+        console.log(chalk.green(`  🌱 ${check.message}`));
         totalPassed++;
       } else {
         if (check.message.includes("beads") || check.message.includes("bd ")) {
-          console.log(chalk.yellow(`  ⚠ ${check.message}`));
+          console.log(chalk.yellow(`  🍋 ${check.message}`));
           if (check.details) console.log(chalk.gray(`    ${check.details}`));
           totalWarnings++;
         } else {
-          console.log(chalk.red(`  ✗ ${check.message}`));
+          console.log(chalk.red(`  🍂 ${check.message}`));
           if (check.details) console.log(chalk.gray(`    ${check.details}`));
           totalFailed++;
         }
@@ -208,12 +208,12 @@ export async function doctor() {
   }
 
   console.log(chalk.bold("Summary"));
-  console.log(chalk.green(`  ✓ ${totalPassed} passed`));
+  console.log(chalk.green(`  🌱 ${totalPassed} passed`));
   if (totalWarnings > 0) {
-    console.log(chalk.yellow(`  ⚠ ${totalWarnings} warnings (optional)`));
+    console.log(chalk.yellow(`  🍋 ${totalWarnings} warnings (optional)`));
   }
   if (totalFailed > 0) {
-    console.log(chalk.red(`  ✗ ${totalFailed} failed`));
+    console.log(chalk.red(`  🍂 ${totalFailed} failed`));
   }
 
   const health =

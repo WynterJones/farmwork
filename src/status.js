@@ -194,22 +194,22 @@ export async function status() {
   console.log(chalk.white("├─────────────────────────────────────────┤"));
   console.log(
     chalk.white("│") +
-      `  CLAUDE.md          ${fs.existsSync(claudeMd) ? chalk.green("        ✓ exists") : chalk.red("        ✗ missing")} ` +
+      `  CLAUDE.md          ${fs.existsSync(claudeMd) ? chalk.green("        🌱 exists") : chalk.red("        🍂 missing")} ` +
       chalk.white("│"),
   );
   console.log(
     chalk.white("│") +
-      `  justfile           ${fs.existsSync(justfile) ? chalk.green("        ✓ exists") : chalk.red("        ✗ missing")} ` +
+      `  justfile           ${fs.existsSync(justfile) ? chalk.green("        🌱 exists") : chalk.red("        🍂 missing")} ` +
       chalk.white("│"),
   );
   console.log(
     chalk.white("│") +
-      `  settings.json      ${fs.existsSync(settingsJson) ? chalk.green("        ✓ exists") : chalk.red("        ✗ missing")} ` +
+      `  settings.json      ${fs.existsSync(settingsJson) ? chalk.green("        🌱 exists") : chalk.red("        🍂 missing")} ` +
       chalk.white("│"),
   );
   console.log(
     chalk.white("│") +
-      `  .beads/            ${fs.existsSync(beadsDir) ? chalk.green("        ✓ exists") : chalk.gray("     not configured")} ` +
+      `  .beads/            ${fs.existsSync(beadsDir) ? chalk.green("        🌱 exists") : chalk.gray("     not configured")} ` +
       chalk.white("│"),
   );
   console.log(chalk.white("└─────────────────────────────────────────┘"));
