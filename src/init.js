@@ -1,189 +1,329 @@
-import inquirer from 'inquirer';
-import chalk from 'chalk';
-import ora from 'ora';
-import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import inquirer from "inquirer";
+import chalk from "chalk";
+import ora from "ora";
+import fs from "fs-extra";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
+const TEMPLATES_DIR = path.join(__dirname, "..", "templates");
+
+// Try to detect package.json info
+function detectPackageJson() {
+  try {
+    const pkgPath = path.join(process.cwd(), "package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+    return {
+      scripts: pkg.scripts || {},
+      hasStorybook: !!(
+        pkg.devDependencies?.storybook ||
+        pkg.dependencies?.storybook ||
+        pkg.devDependencies?.["@storybook/react"] ||
+        pkg.scripts?.storybook
+      ),
+    };
+  } catch {
+    return { scripts: {}, hasStorybook: false };
+  }
+}
 
 const QUESTIONS = [
   {
-    type: 'input',
-    name: 'projectName',
-    message: 'Project name:',
-    default: path.basename(process.cwd())
+    type: "input",
+    name: "projectName",
+    message: "Project name:",
+    default: path.basename(process.cwd()),
   },
   {
-    type: 'list',
-    name: 'projectType',
-    message: 'Project type:',
-    choices: ['nextjs', 'rails', 'python', 'node', 'other']
+    type: "list",
+    name: "packageManager",
+    message: "Package manager:",
+    choices: ["npm", "yarn", "pnpm", "bun"],
   },
   {
-    type: 'list',
-    name: 'packageManager',
-    message: 'Package manager:',
-    choices: ['npm', 'yarn', 'pnpm', 'bun', 'none'],
-    when: (answers) => ['nextjs', 'node'].includes(answers.projectType)
-  },
-  {
-    type: 'input',
-    name: 'testCommand',
-    message: 'Test command:',
+    type: "input",
+    name: "testCommand",
+    message: "Test command:",
     default: (answers) => {
-      const pm = answers.packageManager || 'npm';
-      switch (answers.projectType) {
-        case 'nextjs':
-        case 'node':
-          return `${pm} run test`;
-        case 'rails':
-          return 'bundle exec rspec';
-        case 'python':
-          return 'pytest';
-        default:
-          return 'echo "No tests configured"';
-      }
-    }
+      const { scripts } = detectPackageJson();
+      const pm = answers.packageManager;
+      if (scripts.test) return `${pm} run test`;
+      if (scripts["test:run"]) return `${pm} run test:run`;
+      return `${pm} run test`;
+    },
   },
   {
-    type: 'input',
-    name: 'buildCommand',
-    message: 'Build command:',
+    type: "input",
+    name: "buildCommand",
+    message: "Build command:",
     default: (answers) => {
-      const pm = answers.packageManager || 'npm';
-      switch (answers.projectType) {
-        case 'nextjs':
-          return `${pm} run build`;
-        case 'node':
-          return `${pm} run build`;
-        case 'rails':
-          return 'bundle exec rails assets:precompile';
-        case 'python':
-          return 'python -m build';
-        default:
-          return 'echo "No build configured"';
-      }
-    }
+      const { scripts } = detectPackageJson();
+      const pm = answers.packageManager;
+      if (scripts.build) return `${pm} run build`;
+      return `${pm} run build`;
+    },
   },
   {
-    type: 'input',
-    name: 'lintCommand',
-    message: 'Lint command:',
+    type: "input",
+    name: "lintCommand",
+    message: "Lint command:",
     default: (answers) => {
-      const pm = answers.packageManager || 'npm';
-      switch (answers.projectType) {
-        case 'nextjs':
-        case 'node':
-          return `${pm} run lint`;
-        case 'rails':
-          return 'bundle exec rubocop';
-        case 'python':
-          return 'ruff check .';
-        default:
-          return 'echo "No linting configured"';
-      }
-    }
+      const { scripts } = detectPackageJson();
+      const pm = answers.packageManager;
+      if (scripts.lint) return `${pm} run lint`;
+      return `${pm} run lint`;
+    },
   },
   {
-    type: 'confirm',
-    name: 'includeStorybook',
-    message: 'Include Storybook support? (React/Vue component docs)',
+    type: "confirm",
+    name: "includeStorybook",
+    message: "Include Storybook support? (React/Vue component docs)",
+    default: () => detectPackageJson().hasStorybook,
+  },
+  {
+    type: "confirm",
+    name: "includeI18n",
+    message: "Include i18n support? (multi-language translations)",
     default: false,
-    when: (answers) => ['nextjs', 'node'].includes(answers.projectType)
+  },
+];
+
+const STORYBOOK_QUESTIONS = [
+  {
+    type: "input",
+    name: "storybookUrl",
+    message: "Storybook URL (e.g., storybook.yoursite.com):",
+    default: "storybook.example.com",
   },
   {
-    type: 'confirm',
-    name: 'includeI18n',
-    message: 'Include i18n support? (multi-language translations)',
-    default: false
-  }
+    type: "input",
+    name: "netlifyAuthToken",
+    message: "Netlify Auth Token (from netlify.com/user/applications):",
+    validate: (input) =>
+      input.length > 0 || "Auth token is required for deployment",
+  },
+  {
+    type: "input",
+    name: "netlifySiteId",
+    message: "Netlify Site ID (from site settings):",
+    validate: (input) =>
+      input.length > 0 || "Site ID is required for deployment",
+  },
+  {
+    type: "confirm",
+    name: "passwordProtect",
+    message: "Password protect Storybook? (Recommended for private components)",
+    default: true,
+  },
 ];
 
 export async function init(options) {
   const cwd = process.cwd();
 
-  console.log(chalk.cyan('\n🌾 Farmwork Framework Initialization\n'));
+  console.log(chalk.cyan("\n🌾 Farmwork Initialization\n"));
 
-  let answers;
+  const answers = await inquirer.prompt(QUESTIONS);
 
-  if (options.interactive) {
-    answers = await inquirer.prompt(QUESTIONS);
-  } else {
-    answers = {
-      projectName: path.basename(cwd),
-      projectType: options.template || 'node',
-      packageManager: 'npm',
-      testCommand: 'npm run test',
-      buildCommand: 'npm run build',
-      lintCommand: 'npm run lint',
-      includeStorybook: false,
-      includeI18n: false
-    };
+  // Ask Storybook deployment questions if Storybook is enabled
+  if (answers.includeStorybook) {
+    console.log(chalk.cyan("\n📚 Storybook Deployment Configuration\n"));
+    console.log(
+      chalk.gray(
+        "We recommend deploying Storybook to Netlify with password protection.",
+      ),
+    );
+    console.log(
+      chalk.gray(
+        "This keeps your component documentation private while accessible to your team.\n",
+      ),
+    );
+
+    const storybookAnswers = await inquirer.prompt(STORYBOOK_QUESTIONS);
+    Object.assign(answers, storybookAnswers);
+
+    if (answers.passwordProtect) {
+      console.log(
+        chalk.yellow(
+          "\n⚠️  Remember to enable password protection in Netlify:",
+        ),
+      );
+      console.log(
+        chalk.gray("   Site settings → Access control → Password protection"),
+      );
+    }
   }
 
-  const spinner = ora('Creating Farmwork structure...').start();
+  const spinner = ora("Creating Farmwork structure...").start();
 
   try {
     // Create folder structure
-    await fs.ensureDir(path.join(cwd, '_AUDIT'));
-    await fs.ensureDir(path.join(cwd, '_PLANS'));
-    await fs.ensureDir(path.join(cwd, '.claude', 'commands'));
-    await fs.ensureDir(path.join(cwd, '.claude', 'agents'));
+    await fs.ensureDir(path.join(cwd, "_AUDIT"));
+    await fs.ensureDir(path.join(cwd, "_PLANS"));
+    await fs.ensureDir(path.join(cwd, ".claude", "commands"));
+    await fs.ensureDir(path.join(cwd, ".claude", "agents"));
 
-    spinner.text = 'Creating CLAUDE.md...';
+    spinner.text = "Creating CLAUDE.md...";
     await createClaudeMd(cwd, answers);
 
-    spinner.text = 'Creating FARMHOUSE.md...';
+    spinner.text = "Creating FARMHOUSE.md...";
     await createFarmhouseMd(cwd, answers);
 
-    spinner.text = 'Creating audit documents...';
+    spinner.text = "Creating audit documents...";
     await createAuditDocs(cwd, answers);
 
-    spinner.text = 'Creating justfile...';
+    spinner.text = "Creating justfile...";
     await createJustfile(cwd, answers);
 
-    spinner.text = 'Creating core agents...';
+    spinner.text = "Creating core agents...";
     await createAgents(cwd, answers);
 
-    spinner.text = 'Creating core commands...';
+    spinner.text = "Creating core commands...";
     await createCommands(cwd, answers);
 
-    spinner.text = 'Creating settings...';
+    spinner.text = "Creating settings...";
     await createSettings(cwd, answers);
 
-    spinner.text = 'Creating .produce.json...';
+    spinner.text = "Creating .farmwork.json...";
     await createProduceConfig(cwd, answers);
 
-    spinner.text = 'Initializing beads issue tracking...';
+    // Check and install just if needed
+    spinner.text = "Checking for just command runner...";
     try {
-      const { execSync } = await import('child_process');
-      execSync('bd init', { cwd, stdio: 'ignore' });
+      const { execSync } = await import("child_process");
+      try {
+        execSync("which just", { stdio: "ignore" });
+      } catch {
+        spinner.text = "Installing just...";
+        try {
+          // Try brew first (macOS), then cargo
+          try {
+            execSync("brew install just", { stdio: "inherit" });
+            console.log(
+              chalk.green("\n✓ Just installed successfully via Homebrew"),
+            );
+          } catch {
+            execSync("cargo install just", { stdio: "inherit" });
+            console.log(
+              chalk.green("\n✓ Just installed successfully via Cargo"),
+            );
+          }
+        } catch {
+          console.log(
+            chalk.yellow("\n⚠️  Could not install just automatically."),
+          );
+          console.log(chalk.gray("   Install manually: brew install just"));
+          console.log(chalk.gray("   Or see: https://github.com/casey/just"));
+        }
+      }
     } catch (e) {
-      console.log(chalk.yellow('\n⚠️  Could not initialize beads. Install with: cargo install beads'));
+      // Silently continue if check fails
     }
 
-    spinner.succeed(chalk.green('Farmwork framework initialized!'));
+    spinner.text = "Setting up beads issue tracking...";
+    try {
+      const { execSync } = await import("child_process");
 
-    console.log(chalk.cyan('\n📁 Created structure:'));
-    console.log(`   ${chalk.green('✓')} _AUDIT/`);
-    console.log(`   ${chalk.green('✓')} _PLANS/`);
-    console.log(`   ${chalk.green('✓')} .claude/commands/`);
-    console.log(`   ${chalk.green('✓')} .claude/agents/`);
-    console.log(`   ${chalk.green('✓')} CLAUDE.md`);
-    console.log(`   ${chalk.green('✓')} justfile`);
-    console.log(`   ${chalk.green('✓')} .produce.json`);
+      // Check if bd is installed
+      try {
+        execSync("which bd", { stdio: "ignore" });
+      } catch {
+        // bd not found, try to install it (npm first, then brew, then cargo)
+        spinner.text = "Installing beads (bd)...";
+        let installed = false;
 
-    console.log(chalk.cyan('\n🚀 Next steps:'));
-    console.log(`   1. Run ${chalk.yellow('just --list')} to see available commands`);
-    console.log(`   2. Say ${chalk.yellow('"till the land"')} to Claude to audit your setup`);
-    console.log(`   3. Say ${chalk.yellow('"make a plan for <feature>"')} to start planning`);
-    console.log('');
+        // Try npm first (most common)
+        try {
+          execSync("npm install -g @beads/bd", { stdio: "inherit" });
+          console.log(chalk.green("\n✓ Beads installed successfully via npm"));
+          installed = true;
+        } catch {
+          // Try homebrew
+          try {
+            execSync("brew install steveyegge/beads/bd", { stdio: "inherit" });
+            console.log(
+              chalk.green("\n✓ Beads installed successfully via Homebrew"),
+            );
+            installed = true;
+          } catch {
+            // Try cargo as last resort
+            try {
+              execSync("cargo install beads", { stdio: "inherit" });
+              console.log(
+                chalk.green("\n✓ Beads installed successfully via Cargo"),
+              );
+              installed = true;
+            } catch {
+              // All methods failed
+            }
+          }
+        }
 
+        if (!installed) {
+          console.log(
+            chalk.yellow("\n⚠️  Could not install beads automatically."),
+          );
+          console.log(
+            chalk.gray("   Install manually: npm install -g @beads/bd"),
+          );
+          console.log(chalk.gray("   Or: brew install steveyegge/beads/bd"));
+          console.log(
+            chalk.gray("   Or see: https://github.com/steveyegge/beads"),
+          );
+        }
+      }
+
+      // Initialize beads in the project
+      spinner.text = "Initializing beads...";
+      try {
+        execSync("bd init", { cwd, stdio: "ignore" });
+      } catch {
+        // bd init might fail if already initialized or not installed
+      }
+
+      // Clean up beads-generated agent files (we use CLAUDE.md instead)
+      spinner.text = "Cleaning up beads defaults...";
+      const beadsAgentFiles = ["AGENTS.md", "@AGENTS.md"];
+      for (const file of beadsAgentFiles) {
+        const filePath = path.join(cwd, file);
+        try {
+          await fs.remove(filePath);
+        } catch {
+          // File doesn't exist, ignore
+        }
+      }
+    } catch (e) {
+      console.log(
+        chalk.yellow(
+          "\n⚠️  Could not set up beads. Install with: cargo install beads",
+        ),
+      );
+    }
+
+    spinner.succeed(chalk.green("Farmwork initialized!"));
+
+    console.log(chalk.cyan("\n📁 Created structure:"));
+    console.log(`   ${chalk.green("✓")} _AUDIT/`);
+    console.log(`   ${chalk.green("✓")} _PLANS/`);
+    console.log(`   ${chalk.green("✓")} .claude/commands/`);
+    console.log(`   ${chalk.green("✓")} .claude/agents/`);
+    console.log(`   ${chalk.green("✓")} CLAUDE.md`);
+    console.log(`   ${chalk.green("✓")} justfile`);
+    console.log(`   ${chalk.green("✓")} .farmwork.json`);
+
+    console.log(chalk.cyan("\n🚀 Next steps:"));
+    console.log(
+      `   1. Run ${chalk.yellow("just --list")} to see available commands`,
+    );
+    console.log(
+      `   2. Say ${chalk.yellow('"till the land"')} to Claude to audit your setup`,
+    );
+    console.log(
+      `   3. Say ${chalk.yellow('"make a plan for <feature>"')} to start planning`,
+    );
+    console.log("");
   } catch (error) {
-    spinner.fail(chalk.red('Failed to initialize Farmwork'));
+    spinner.fail(chalk.red("Failed to initialize Farmwork"));
     console.error(error);
     process.exit(1);
   }
@@ -293,7 +433,6 @@ After user approves:
 
 ## Project Configuration
 
-- **Type:** ${answers.projectType}
 - **Test Command:** \`${answers.testCommand}\`
 - **Build Command:** \`${answers.buildCommand}\`
 - **Lint Command:** \`${answers.lintCommand}\`
@@ -314,11 +453,11 @@ ${answers.buildCommand}   # Verify compilation
 \`\`\`
 `;
 
-  await fs.writeFile(path.join(cwd, 'CLAUDE.md'), content);
+  await fs.writeFile(path.join(cwd, "CLAUDE.md"), content);
 }
 
 async function createFarmhouseMd(cwd, answers) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   const content = `# Farmwork Farmhouse
 
@@ -416,33 +555,33 @@ bd close <id>         # Complete work
 | ${today} | Initial FARMHOUSE setup via Farmwork CLI |
 `;
 
-  await fs.writeFile(path.join(cwd, '_AUDIT', 'FARMHOUSE.md'), content);
+  await fs.writeFile(path.join(cwd, "_AUDIT", "FARMHOUSE.md"), content);
 }
 
 async function createAuditDocs(cwd, answers) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   const audits = [
     {
-      name: 'SECURITY.md',
-      title: 'Security Audit',
-      description: 'Security posture and vulnerability tracking'
+      name: "SECURITY.md",
+      title: "Security Audit",
+      description: "Security posture and vulnerability tracking",
     },
     {
-      name: 'PERFORMANCE.md',
-      title: 'Performance Audit',
-      description: 'Performance metrics and optimization tracking'
+      name: "PERFORMANCE.md",
+      title: "Performance Audit",
+      description: "Performance metrics and optimization tracking",
     },
     {
-      name: 'CODE_QUALITY.md',
-      title: 'Code Quality Audit',
-      description: 'Code quality and standards tracking'
+      name: "CODE_QUALITY.md",
+      title: "Code Quality Audit",
+      description: "Code quality and standards tracking",
     },
     {
-      name: 'TESTS.md',
-      title: 'Test Coverage Audit',
-      description: 'Test coverage and gaps tracking'
-    }
+      name: "TESTS.md",
+      title: "Test Coverage Audit",
+      description: "Test coverage and gaps tracking",
+    },
   ];
 
   for (const audit of audits) {
@@ -483,12 +622,12 @@ _None currently_
 | ${today} | Initial ${audit.title.toLowerCase()} setup via Farmwork CLI |
 `;
 
-    await fs.writeFile(path.join(cwd, '_AUDIT', audit.name), content);
+    await fs.writeFile(path.join(cwd, "_AUDIT", audit.name), content);
   }
 }
 
 async function createJustfile(cwd, answers) {
-  const content = `# ${answers.projectName} - Farmwork Framework
+  const content = `# ${answers.projectName} - Farmwork
 # Run \`just --list\` to see all commands
 
 # Variables
@@ -500,10 +639,7 @@ project_root := justfile_directory()
 
 # Start development server
 dev:
-    ${answers.projectType === 'nextjs' ? 'npm run dev' :
-      answers.projectType === 'rails' ? 'bin/rails server' :
-      answers.projectType === 'python' ? 'python -m flask run' :
-      'echo "Configure dev command"'}
+    npm run dev
 
 # Run linter
 lint:
@@ -570,12 +706,12 @@ completed:
     @bd list --status closed 2>/dev/null | wc -l || echo "0"
 `;
 
-  await fs.writeFile(path.join(cwd, 'justfile'), content);
+  await fs.writeFile(path.join(cwd, "justfile"), content);
 }
 
 async function createAgents(cwd, answers) {
   const agents = {
-    'the-farmer.md': `---
+    "the-farmer.md": `---
 name: the-farmer
 description: Audit and update FARMHOUSE.md with current project metrics
 tools: Read, Grep, Glob, Edit, Bash
@@ -609,7 +745,7 @@ Maintains \`_AUDIT/FARMHOUSE.md\` - the living document tracking all systems and
 ### Score: X/10
 \`\`\`
 `,
-    'code-reviewer.md': `---
+    "code-reviewer.md": `---
 name: code-reviewer
 description: Review code for quality, security, and maintainability
 tools: Read, Grep, Glob, Bash
@@ -626,7 +762,7 @@ Reviews staged/modified files for:
 
 Reports findings with severity (CRITICAL, HIGH, MEDIUM, LOW) and remediation steps.
 `,
-    'security-auditor.md': `---
+    "security-auditor.md": `---
 name: security-auditor
 description: OWASP security vulnerability scanning
 tools: Read, Grep, Glob
@@ -645,7 +781,7 @@ Scans for OWASP Top 10 vulnerabilities:
 Reports findings by severity with specific remediation steps.
 Updates \`_AUDIT/SECURITY.md\` with results.
 `,
-    'performance-auditor.md': `---
+    "performance-auditor.md": `---
 name: performance-auditor
 description: Find memory leaks, unnecessary re-renders, and anti-patterns
 tools: Read, Grep, Glob
@@ -663,23 +799,64 @@ Scans for performance anti-patterns:
 
 Reports findings with impact assessment.
 Updates \`_AUDIT/PERFORMANCE.md\` with results.
-`
+`,
   };
 
   for (const [filename, content] of Object.entries(agents)) {
-    await fs.writeFile(path.join(cwd, '.claude', 'agents', filename), content);
+    await fs.writeFile(path.join(cwd, ".claude", "agents", filename), content);
   }
 }
 
 async function createCommands(cwd, answers) {
+  const pm = answers.packageManager || "npm";
+
+  // Build Storybook deployment steps if enabled
+  const storybookSteps = answers.includeStorybook
+    ? `
+
+### Step 6: Build & Deploy Storybook
+
+Build Storybook for production:
+\`\`\`bash
+${pm} run build-storybook
+\`\`\`
+
+Deploy to Netlify (requires NETLIFY_AUTH_TOKEN and NETLIFY_STORYBOOK_SITE_ID in .claude/settings.local.json):
+\`\`\`bash
+npx netlify deploy --dir=storybook-static --site=$NETLIFY_STORYBOOK_SITE_ID --prod
+\`\`\`
+
+Storybook URL: https://${answers.storybookUrl || "storybook.example.com"}
+${answers.passwordProtect ? "**Note:** This Storybook is password protected." : ""}
+`
+    : "";
+
+  const finalStep = answers.includeStorybook
+    ? "### Step 7: Report Success"
+    : "### Step 6: Report Success";
+  const reportContent = answers.includeStorybook
+    ? `
+Show summary:
+- Files changed
+- Commit hash
+- Push status
+- Storybook deploy status
+`
+    : `
+Show summary:
+- Files changed
+- Commit hash
+- Push status
+`;
+
   const pushCommand = `---
-description: Clean, lint, test, build, commit, and push
-allowed-tools: Bash(git:*), Bash(${answers.packageManager || 'npm'}:*)
+description: Clean, lint, test, build, commit, and push${answers.includeStorybook ? " (+ deploy Storybook)" : ""}
+allowed-tools: Bash(git:*), Bash(${pm}:*), Bash(npx:*)
 ---
 
 # Push Command
 
-Run quality gates, commit changes, and push to remote.
+Run quality gates, commit changes, and push to remote.${answers.includeStorybook ? " Then deploy Storybook." : ""}
 
 ## Workflow
 
@@ -717,16 +894,14 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 \`\`\`
 
 Then push: \`git push\`
+${storybookSteps}
+${finalStep}
+${reportContent}`;
 
-### Step 6: Report Success
-
-Show summary:
-- Files changed
-- Commit hash
-- Push status
-`;
-
-  await fs.writeFile(path.join(cwd, '.claude', 'commands', 'push.md'), pushCommand);
+  await fs.writeFile(
+    path.join(cwd, ".claude", "commands", "push.md"),
+    pushCommand,
+  );
 }
 
 async function createSettings(cwd, answers) {
@@ -734,42 +909,84 @@ async function createSettings(cwd, answers) {
     permissions: {
       allow: [],
       deny: [],
-      ask: []
-    }
+      ask: [],
+    },
   };
 
   await fs.writeFile(
-    path.join(cwd, '.claude', 'settings.json'),
-    JSON.stringify(settings, null, 2)
+    path.join(cwd, ".claude", "settings.json"),
+    JSON.stringify(settings, null, 2),
   );
+
+  // Create local settings for sensitive data (gitignored)
+  if (answers.includeStorybook && answers.netlifyAuthToken) {
+    const localSettings = {
+      env: {
+        NETLIFY_AUTH_TOKEN: answers.netlifyAuthToken,
+        NETLIFY_STORYBOOK_SITE_ID: answers.netlifySiteId,
+      },
+    };
+
+    await fs.writeFile(
+      path.join(cwd, ".claude", "settings.local.json"),
+      JSON.stringify(localSettings, null, 2),
+    );
+
+    // Ensure settings.local.json is gitignored
+    const gitignorePath = path.join(cwd, ".gitignore");
+    let gitignoreContent = "";
+    try {
+      gitignoreContent = await fs.readFile(gitignorePath, "utf-8");
+    } catch {
+      // .gitignore doesn't exist yet
+    }
+
+    const entriesToAdd = [".claude/settings.local.json", "storybook-static/"];
+
+    const linesToAdd = entriesToAdd.filter(
+      (entry) => !gitignoreContent.includes(entry),
+    );
+
+    if (linesToAdd.length > 0) {
+      const newContent =
+        gitignoreContent.trim() +
+        (gitignoreContent.trim() ? "\n\n" : "") +
+        "# Farmwork - Storybook deployment\n" +
+        linesToAdd.join("\n") +
+        "\n";
+      await fs.writeFile(gitignorePath, newContent);
+    }
+  }
 }
 
 async function createProduceConfig(cwd, answers) {
   const config = {
-    version: '1.0.0',
+    version: "1.0.0",
     projectName: answers.projectName,
-    projectType: answers.projectType,
-    packageManager: answers.packageManager || null,
     commands: {
       test: answers.testCommand,
       build: answers.buildCommand,
-      lint: answers.lintCommand
+      lint: answers.lintCommand,
     },
     features: {
       storybook: answers.includeStorybook || false,
-      i18n: answers.includeI18n || false
+      i18n: answers.includeI18n || false,
     },
-    audits: [
-      'FARMHOUSE',
-      'SECURITY',
-      'PERFORMANCE',
-      'CODE_QUALITY',
-      'TESTS'
-    ]
+    audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "CODE_QUALITY", "TESTS"],
   };
 
+  // Add Storybook configuration if enabled
+  if (answers.includeStorybook) {
+    config.storybook = {
+      url: answers.storybookUrl || null,
+      passwordProtected: answers.passwordProtect || false,
+      deployCommand:
+        "npx netlify deploy --dir=storybook-static --site=$NETLIFY_STORYBOOK_SITE_ID --prod",
+    };
+  }
+
   await fs.writeFile(
-    path.join(cwd, '.produce.json'),
-    JSON.stringify(config, null, 2)
+    path.join(cwd, ".farmwork.json"),
+    JSON.stringify(config, null, 2),
   );
 }

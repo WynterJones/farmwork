@@ -34,19 +34,22 @@ farmwork status
 
 ### `farmwork init`
 
-Initialize the Farmwork framework in your current directory.
+Initialize the Farmwork framework in your current directory. Runs an interactive setup wizard to configure your project for any tech stack.
 
 ```bash
-farmwork init                    # Quick setup with defaults
-farmwork init -i                 # Interactive setup wizard
-farmwork init -t nextjs          # Use Next.js template
+farmwork init                    # Interactive setup wizard
 farmwork init -f                 # Force overwrite existing files
 ```
 
 **Options:**
-- `-i, --interactive` - Run the interactive setup wizard
-- `-t, --template <type>` - Project template (nextjs, rails, python, node)
 - `-f, --force` - Overwrite existing files
+
+**Storybook Support:**
+If you enable Storybook (for React/Vue projects), the wizard will also ask for:
+- Storybook URL (e.g., storybook.yoursite.com)
+- Netlify Auth Token (for deployment)
+- Netlify Site ID
+- Password protection preference (recommended)
 
 **Creates:**
 - `CLAUDE.md` - Main instructions and phrase commands

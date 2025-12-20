@@ -1,7 +1,7 @@
-import fs from 'fs-extra';
-import path from 'path';
-import chalk from 'chalk';
-import ora from 'ora';
+import fs from "fs-extra";
+import path from "path";
+import chalk from "chalk";
+import ora from "ora";
 
 const TEMPLATES = {
   agent: (name, description) => `# ${name} Agent
@@ -35,7 +35,10 @@ Prompt: "[Example prompt]"
 \`\`\`
 `,
 
-  command: (name, description) => `# ${name.charAt(0).toUpperCase() + name.slice(1)} Command
+  command: (
+    name,
+    description,
+  ) => `# ${name.charAt(0).toUpperCase() + name.slice(1)} Command
 
 ${description}
 
@@ -64,7 +67,7 @@ Show a summary of what was accomplished.
 
 > [One-line description of this audit area]
 
-**Last Updated:** ${new Date().toISOString().split('T')[0]}
+**Last Updated:** ${new Date().toISOString().split("T")[0]}
 **Score:** 0.0/10
 **Status:** 0 open items
 
@@ -100,31 +103,31 @@ _None currently_
 
 | Date | Changes |
 |------|---------|
-| ${new Date().toISOString().split('T')[0]} | Initial audit document |
-`
+| ${new Date().toISOString().split("T")[0]} | Initial audit document |
+`,
 };
 
 export async function add(type, name, options) {
   const cwd = process.cwd();
   const spinner = ora();
 
-  const validTypes = ['agent', 'command', 'audit'];
+  const validTypes = ["agent", "command", "audit"];
   if (!validTypes.includes(type)) {
     console.log(chalk.red(`\n❌ Invalid type: ${type}`));
-    console.log(chalk.gray(`   Valid types: ${validTypes.join(', ')}`));
+    console.log(chalk.gray(`   Valid types: ${validTypes.join(", ")}`));
     return;
   }
 
   if (!name) {
-    console.log(chalk.red('\n❌ Name is required'));
+    console.log(chalk.red("\n❌ Name is required"));
     console.log(chalk.gray(`   Usage: produce add ${type} <name>`));
     return;
   }
 
-  const claudeDir = path.join(cwd, '.claude');
+  const claudeDir = path.join(cwd, ".claude");
   if (!fs.existsSync(claudeDir)) {
-    console.log(chalk.red('\n❌ Farmwork framework not initialized'));
-    console.log(chalk.gray('   Run: produce init'));
+    console.log(chalk.red("\n❌ Farmwork not initialized"));
+    console.log(chalk.gray("   Run: produce init"));
     return;
   }
 
@@ -136,18 +139,18 @@ export async function add(type, name, options) {
     let description = options?.description || `[Description for ${name}]`;
 
     switch (type) {
-      case 'agent':
-        filePath = path.join(claudeDir, 'agents', `${name}.md`);
+      case "agent":
+        filePath = path.join(claudeDir, "agents", `${name}.md`);
         content = TEMPLATES.agent(name, description);
         break;
 
-      case 'command':
-        filePath = path.join(claudeDir, 'commands', `${name}.md`);
+      case "command":
+        filePath = path.join(claudeDir, "commands", `${name}.md`);
         content = TEMPLATES.command(name, description);
         break;
 
-      case 'audit':
-        const auditDir = path.join(cwd, '_AUDIT');
+      case "audit":
+        const auditDir = path.join(cwd, "_AUDIT");
         if (!fs.existsSync(auditDir)) {
           fs.mkdirSync(auditDir, { recursive: true });
         }
@@ -173,14 +176,17 @@ export async function add(type, name, options) {
     console.log(chalk.gray(`\n   File: ${filePath}`));
     console.log(chalk.cyan(`\n   Edit the file to customize the ${type}.`));
 
-    if (type === 'agent') {
-      console.log(chalk.gray(`\n   Launch with: Task tool, subagent_type="${name}"`));
-    } else if (type === 'command') {
+    if (type === "agent") {
+      console.log(
+        chalk.gray(`\n   Launch with: Task tool, subagent_type="${name}"`),
+      );
+    } else if (type === "command") {
       console.log(chalk.gray(`\n   Invoke with: /${name}`));
-    } else if (type === 'audit') {
-      console.log(chalk.gray(`\n   Update FARMHOUSE.md to reference this audit.`));
+    } else if (type === "audit") {
+      console.log(
+        chalk.gray(`\n   Update FARMHOUSE.md to reference this audit.`),
+      );
     }
-
   } catch (error) {
     spinner.fail(`Failed to add ${type}`);
     console.log(chalk.red(`   ${error.message}`));

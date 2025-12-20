@@ -23,8 +23,6 @@ program
 program
   .command('init')
   .description('Initialize Farmwork in current directory')
-  .option('-i, --interactive', 'Run interactive setup wizard')
-  .option('-t, --template <type>', 'Project template (nextjs, rails, python, node)')
   .option('-f, --force', 'Overwrite existing files')
   .action(init);
 
