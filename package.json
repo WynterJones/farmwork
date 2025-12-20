@@ -1,0 +1,40 @@
+{
+  "name": "farmwork",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Farmwork - Agentic development harness for AI-assisted projects",
+  "main": "src/index.js",
+  "bin": {
+    "farmwork": "./bin/farmwork.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "cli",
+    "ai",
+    "claude",
+    "development",
+    "workflow",
+    "automation",
+    "agentic"
+  ],
+  "author": "Wynter Jones",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "inquirer": "^9.2.12",
+    "ora": "^8.0.1",
+    "fs-extra": "^11.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wynterjones/farmwork"
+  },
+  "homepage": "https://farmwork.wynter.ai"
+}
