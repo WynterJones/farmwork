@@ -40,7 +40,7 @@ npx farmwork init
 | Phrase | Action |
 |--------|--------|
 | `open the farm` | Audit systems, update FARMHOUSE.md metrics |
-| `count the herd` | Full inspection + dry run (code review, performance, security, quality, accessibility) |
+| `count the herd` | Full inspection and audit |
 | `go to market` | i18n translation check + accessibility audit |
 | `close the farm` | Full push workflow (lint, test, build, commit, push) |
 
