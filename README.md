@@ -43,11 +43,10 @@ npx farmwork init
 **Farmwork Phrases** (Development Workflow):
 | Phrase | Action |
 |--------|--------|
-| `till the land` | Audit systems, update FARMHOUSE.md metrics |
-| `inspect the farm` | Full inspection (code review, performance, security, quality) |
-| `go to market` | i18n translation check |
-| `harvest crops` | Full push workflow (lint, test, build, commit, push) |
-| `open the farm` | Full audit cycle, then ask to proceed |
+| `open the farm` | Audit systems, update FARMHOUSE.md metrics |
+| `count the herd` | Full inspection + dry run (code review, performance, security, quality, accessibility) |
+| `go to market` | i18n translation check + accessibility audit |
+| `close the farm` | Full push workflow (lint, test, build, commit, push) |
 
 **Plan Phrases**:
 | Phrase | Action |
@@ -59,12 +58,11 @@ npx farmwork init
 
 | Command | Description |
 |---------|-------------|
-| `/push` | Stage, lint, test, build, commit, push |
-| `/open-the-farm` | Full audit cycle with summary report |
+| `/push` | Clean, stage, lint, test, build, commit, push, update metrics (11 steps) |
 
 ### Agents
 
-9 specialized agents included:
+10 specialized agents included:
 
 | Agent | Purpose |
 |-------|---------|
@@ -73,6 +71,7 @@ npx farmwork init
 | `security-auditor` | OWASP vulnerability scanning |
 | `performance-auditor` | Memory leaks, re-renders, anti-patterns |
 | `code-smell-auditor` | DRY violations, complexity, naming |
+| `accessibility-auditor` | WCAG 2.1 compliance, alt text, contrast |
 | `unused-code-cleaner` | Detect and remove dead code |
 | `code-cleaner` | Remove comments and console.logs |
 | `i18n-locale-translator` | Translate UI text to locales |
@@ -80,11 +79,13 @@ npx farmwork init
 
 ### Recommended Workflow
 
-1. **Start Session**: Run `till the land` to audit current state
+1. **Start Session**: Run `open the farm` to audit current state
 2. **Plan Work**: Use `make a plan for...` for new features
 3. **Implement**: Use `let's implement...` to execute with tracking
-4. **Quality Check**: Run `inspect the farm` or `/open-the-farm`
-5. **Ship**: Run `harvest crops` or `/push` to push changes
+4. **Quality Check**: Run `count the herd` for full audit + dry run
+5. **Ship**: Run `close the farm` or `/push` to push changes
+
+You can `go to market` when you have a production-ready app with international users.
 
 ## Directory Structure
 
@@ -92,23 +93,24 @@ npx farmwork init
 your-project/
 ├── CLAUDE.md           # Main instructions & phrase commands
 ├── .claude/            # Claude Code configuration
-│   ├── agents/         # 9 specialized subagents
+│   ├── agents/         # 10 specialized subagents
 │   │   ├── the-farmer.md
 │   │   ├── code-reviewer.md
 │   │   ├── security-auditor.md
 │   │   ├── performance-auditor.md
 │   │   ├── code-smell-auditor.md
+│   │   ├── accessibility-auditor.md
 │   │   ├── unused-code-cleaner.md
 │   │   ├── code-cleaner.md
 │   │   ├── i18n-locale-translator.md
 │   │   └── storybook-maintainer.md
 │   └── commands/       # User-invocable skills
-│       ├── push.md
-│       └── open-the-farm.md
+│       └── push.md
 ├── _AUDIT/             # Living audit documents
 │   ├── FARMHOUSE.md    # Framework command center
 │   ├── SECURITY.md     # Security posture
 │   ├── PERFORMANCE.md  # Performance metrics
+│   ├── ACCESSIBILITY.md # WCAG 2.1 compliance
 │   ├── CODE_QUALITY.md # Code quality tracking
 │   └── TESTS.md        # Test coverage
 ├── _PLANS/             # Implementation plans
@@ -143,12 +145,13 @@ If you enable Storybook (for React/Vue projects), the wizard will also ask for:
 - `CLAUDE.md` - Main instructions and phrase commands
 - `.claude/` - Claude Code configuration directory
   - `settings.json` - Project settings
-  - `agents/` - 9 specialized subagents
-  - `commands/` - 2 user-invocable skills
+  - `agents/` - 10 specialized subagents
+  - `commands/` - 1 user-invocable skill (/push)
 - `_AUDIT/` - Living audit documents
   - `FARMHOUSE.md` - Framework command center
   - `SECURITY.md` - Security posture tracking
   - `PERFORMANCE.md` - Performance metrics
+  - `ACCESSIBILITY.md` - WCAG 2.1 compliance
   - `CODE_QUALITY.md` - Code quality tracking
   - `TESTS.md` - Test coverage tracking
 - `_PLANS/` - Implementation plans directory

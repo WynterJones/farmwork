@@ -21,11 +21,10 @@ Farmwork is an opinionated framework for organizing AI-assisted development work
 - **Quality Gates** - Automated lint, test, build pipelines
 
 The farming metaphor makes workflows memorable:
-- "till the land" = audit your systems
-- "inspect the farm" = full code inspection
-- "go to market" = i18n translations
-- "harvest crops" = push to production
-- "open the farm" = full development cycle
+- "open the farm" = audit your systems (update FARMHOUSE.md)
+- "count the herd" = full code inspection + dry run (no push)
+- "go to market" = i18n translations + accessibility audit
+- "close the farm" = push to production
 
 ---
 
@@ -41,6 +40,7 @@ your-project/
 │   ├── FARMHOUSE.md        # Agentic harness metrics
 │   ├── SECURITY.md         # Security posture
 │   ├── PERFORMANCE.md      # Performance metrics
+│   ├── ACCESSIBILITY.md    # WCAG 2.1 compliance
 │   ├── CODE_QUALITY.md     # Code quality tracking
 │   └── TESTS.md            # Test coverage
 ├── _PLANS/                 # Implementation plans (temporary)
@@ -68,11 +68,10 @@ Farmwork defines three categories of phrase commands:
 #### Farmwork Phrases (Development Workflow)
 | Phrase | Action |
 |--------|--------|
-| `till the land` | Audit systems, update FARMHOUSE.md metrics |
-| `inspect the farm` | Full inspection: code review, cleanup, performance, security, code quality |
-| `go to market` | i18n translation scan |
-| `harvest crops` | Push to production (lint, test, build, commit, push) |
-| `open the farm` | Full audit cycle, then ask to proceed |
+| `open the farm` | Audit systems, update FARMHOUSE.md metrics |
+| `count the herd` | Full inspection + dry run: code review, cleanup, performance, security, code quality, accessibility |
+| `go to market` | i18n translation scan + accessibility audit |
+| `close the farm` | Push to production (lint, test, build, commit, push) |
 
 #### Plan Phrases
 | Phrase | Action |
@@ -310,18 +309,28 @@ Reports findings with severity and remediation steps.
 
 ```markdown
 ---
-description: Clean, lint, test, build, commit, and push
-allowed-tools: Bash(git:*), Bash(npm:*)
+description: Clean, stage, lint, test, build, commit, push, and update metrics
+argument-hint: [optional: commit message override]
+allowed-tools: Bash(find:*), Bash(git:*), Bash(npm:*), Task
 ---
 
 # Push Command
 
-1. Stage all changes: `git add -A`
-2. Run linter: `npm run lint`
-3. Run tests: `npm run test`
-4. Build: `npm run build`
-5. Generate commit message from changes
-6. Commit and push
+Run code cleanup, all quality gates, commit changes, and push to remote.
+
+## Workflow (11 Steps)
+
+1. **Clean Up System Files** - Remove .DS_Store files
+2. **Sync Packages** - Clean reinstall node_modules for lock file sync
+3. **Stage All Changes** - `git add -A`
+4. **Check for Changes** - Verify staged changes exist
+5. **Clean Code** - Run code-cleaner agent to remove comments/console.logs
+6. **Run Quality Gates** - Lint, (Storybook), Tests, Build
+7. **Generate Commit Message** - Analyze changes, create descriptive message
+8. **Commit and Push** - Create commit with FARMWORK footer, push to remote
+9. **Deploy Storybook** - (If configured) Deploy to Netlify
+10. **Update Farmhouse Metrics** - Run the-farmer agent
+11. **Report Success** - Show summary of changes
 ```
 
 ### Step 7: Create Audit Templates
@@ -379,6 +388,36 @@ _None currently_
 **Last Updated:** YYYY-MM-DD
 **Score:** X/10
 **Status:** X open items
+
+---
+
+## Open Items
+
+_None currently_
+
+---
+
+## Audit History
+
+| Date | Changes |
+|------|---------|
+```
+
+#### `_AUDIT/ACCESSIBILITY.md`
+```markdown
+# Accessibility Audit
+
+> WCAG 2.1 Level AA compliance tracking.
+
+**Last Updated:** YYYY-MM-DD
+**Score:** X/10
+**Status:** X open items
+
+---
+
+## How to get 10/10
+
+All images have meaningful alt text, all interactive elements are keyboard accessible, color contrast meets WCAG AA standards, all forms have proper labels, and ARIA is used correctly.
 
 ---
 
@@ -538,7 +577,7 @@ For any non-trivial work:
 4. Confirm before Claude starts coding
 
 ### 3. Regular Audits
-Run "till the land" regularly to keep FARMHOUSE.md current. This helps:
+Run "open the farm" regularly to keep FARMHOUSE.md current. This helps:
 - Track project health over time
 - Identify documentation gaps
 - Maintain accurate metrics
@@ -551,9 +590,10 @@ Run "till the land" regularly to keep FARMHOUSE.md current. This helps:
 
 ### 5. Phrase Command Discipline
 Use phrase commands consistently:
-- "open the farm" before major releases
-- "inspect the farm" after significant changes
-- "harvest crops" when ready to push
+- "open the farm" to audit systems at start of session
+- "count the herd" before major releases (full audit + dry run)
+- "go to market" for i18n and accessibility checks
+- "close the farm" when ready to push
 
 ---
 

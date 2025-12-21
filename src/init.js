@@ -126,7 +126,8 @@ export async function init(options) {
   const farmworkConfig = path.join(cwd, ".farmwork.json");
   const claudeMd = path.join(cwd, "CLAUDE.md");
 
-  const isAlreadyInstalled = fs.existsSync(claudeDir) &&
+  const isAlreadyInstalled =
+    fs.existsSync(claudeDir) &&
     (fs.existsSync(farmworkConfig) || fs.existsSync(claudeMd));
 
   if (isAlreadyInstalled && !options.force) {
@@ -146,12 +147,15 @@ export async function init(options) {
         name: "continueInit",
         message: "What would you like to do?",
         choices: [
-          { name: "🐴 Re-initialize (will backup existing files)", value: "reinit" },
+          {
+            name: "🐴 Re-initialize (will backup existing files)",
+            value: "reinit",
+          },
           { name: "🐮 Run doctor instead (check health)", value: "doctor" },
           { name: "🌾 Run status instead (view metrics)", value: "status" },
-          { name: "🐔 Exit", value: "exit" }
-        ]
-      }
+          { name: "🐔 Exit", value: "exit" },
+        ],
+      },
     ]);
 
     if (continueInit === "exit") {
@@ -179,7 +183,9 @@ export async function init(options) {
   }
 
   farmTerm.header("FARMWORK INITIALIZATION", "primary");
-  farmTerm.info("Let's set up your farm! Answer a few questions to get started.\n");
+  farmTerm.info(
+    "Let's set up your farm! Answer a few questions to get started.\n",
+  );
 
   const answers = await inquirer.prompt(QUESTIONS);
 
@@ -187,8 +193,12 @@ export async function init(options) {
   if (answers.includeStorybook) {
     farmTerm.nl();
     farmTerm.section("Storybook Deployment", "🐄");
-    farmTerm.gray("  We recommend deploying Storybook to Netlify with password protection.\n");
-    farmTerm.gray("  This keeps your component docs private but accessible to your team.\n\n");
+    farmTerm.gray(
+      "  We recommend deploying Storybook to Netlify with password protection.\n",
+    );
+    farmTerm.gray(
+      "  This keeps your component docs private but accessible to your team.\n\n",
+    );
 
     const storybookAnswers = await inquirer.prompt(STORYBOOK_QUESTIONS);
     Object.assign(answers, storybookAnswers);
@@ -203,12 +213,39 @@ export async function init(options) {
   // Check for existing files
   const existingFiles = [];
   const filesToCheck = [
-    { path: path.join(cwd, "CLAUDE.md"), name: "CLAUDE.md", backup: "OLD_CLAUDE.md" },
-    { path: path.join(cwd, "justfile"), name: "justfile", backup: "OLD_justfile" },
-    { path: path.join(cwd, ".farmwork.json"), name: ".farmwork.json", backup: null },
-    { path: path.join(cwd, ".claude", "commands"), name: ".claude/commands/", backup: null, isDir: true },
-    { path: path.join(cwd, ".claude", "agents"), name: ".claude/agents/", backup: null, isDir: true },
-    { path: path.join(cwd, "_AUDIT"), name: "_AUDIT/", backup: null, isDir: true },
+    {
+      path: path.join(cwd, "CLAUDE.md"),
+      name: "CLAUDE.md",
+      backup: "OLD_CLAUDE.md",
+    },
+    {
+      path: path.join(cwd, "justfile"),
+      name: "justfile",
+      backup: "OLD_justfile",
+    },
+    {
+      path: path.join(cwd, ".farmwork.json"),
+      name: ".farmwork.json",
+      backup: null,
+    },
+    {
+      path: path.join(cwd, ".claude", "commands"),
+      name: ".claude/commands/",
+      backup: null,
+      isDir: true,
+    },
+    {
+      path: path.join(cwd, ".claude", "agents"),
+      name: ".claude/agents/",
+      backup: null,
+      isDir: true,
+    },
+    {
+      path: path.join(cwd, "_AUDIT"),
+      name: "_AUDIT/",
+      backup: null,
+      isDir: true,
+    },
   ];
 
   for (const file of filesToCheck) {
@@ -244,7 +281,10 @@ export async function init(options) {
         name: "overwriteChoice",
         message: "How would you like to proceed?",
         choices: [
-          { name: "🌱 Continue (backup files, add to existing folders)", value: "overwrite" },
+          {
+            name: "🌱 Continue (backup files, add to existing folders)",
+            value: "overwrite",
+          },
           { name: "🐔 Cancel installation", value: "cancel" },
         ],
       },
@@ -279,20 +319,32 @@ export async function init(options) {
   try {
     // Create folder structure with animations
     const steps = [
-      { name: "Creating directories", fn: async () => {
-        await fs.ensureDir(path.join(cwd, "_AUDIT"));
-        await fs.ensureDir(path.join(cwd, "_PLANS"));
-        await fs.ensureDir(path.join(cwd, ".claude", "commands"));
-        await fs.ensureDir(path.join(cwd, ".claude", "agents"));
-      }},
+      {
+        name: "Creating directories",
+        fn: async () => {
+          await fs.ensureDir(path.join(cwd, "_AUDIT"));
+          await fs.ensureDir(path.join(cwd, "_PLANS"));
+          await fs.ensureDir(path.join(cwd, ".claude", "commands"));
+          await fs.ensureDir(path.join(cwd, ".claude", "agents"));
+        },
+      },
       { name: "Planting CLAUDE.md", fn: () => createClaudeMd(cwd, answers) },
-      { name: "Building FARMHOUSE.md", fn: () => createFarmhouseMd(cwd, answers) },
-      { name: "Creating audit documents", fn: () => createAuditDocs(cwd, answers) },
+      {
+        name: "Building FARMHOUSE.md",
+        fn: () => createFarmhouseMd(cwd, answers),
+      },
+      {
+        name: "Creating audit documents",
+        fn: () => createAuditDocs(cwd, answers),
+      },
       { name: "Laying out justfile", fn: () => createJustfile(cwd, answers) },
       { name: "Training agents", fn: () => createAgents(cwd, answers) },
       { name: "Setting up commands", fn: () => createCommands(cwd, answers) },
       { name: "Configuring settings", fn: () => createSettings(cwd, answers) },
-      { name: "Writing .farmwork.json", fn: () => createProduceConfig(cwd, answers) },
+      {
+        name: "Writing .farmwork.json",
+        fn: () => createProduceConfig(cwd, answers),
+      },
     ];
 
     for (const step of steps) {
@@ -376,15 +428,18 @@ export async function init(options) {
 
     // Show created structure
     farmTerm.section("Created Structure", emojis.corn);
-    await farmTerm.planting([
-      "_AUDIT/",
-      "_PLANS/",
-      ".claude/commands/",
-      ".claude/agents/",
-      "CLAUDE.md",
-      "justfile",
-      ".farmwork.json",
-    ], "Files planted");
+    await farmTerm.planting(
+      [
+        "_AUDIT/",
+        "_PLANS/",
+        ".claude/commands/",
+        ".claude/agents/",
+        "CLAUDE.md",
+        "justfile",
+        ".farmwork.json",
+      ],
+      "Files planted",
+    );
 
     // Next steps
     farmTerm.section("Next Steps", emojis.carrot);
@@ -393,7 +448,7 @@ export async function init(options) {
     farmTerm.yellow("just --list");
     farmTerm.gray(" → See available commands\n");
     farmTerm.white("  2. ");
-    farmTerm.yellow('"till the land"');
+    farmTerm.yellow('"open the farm"');
     farmTerm.gray(" → Audit your setup\n");
     farmTerm.white("  3. ");
     farmTerm.yellow('"make a plan for <feature>"');
@@ -404,35 +459,44 @@ export async function init(options) {
     farmTerm.section("Get Claude Comfortable", emojis.wheat);
     farmTerm.gray("  Copy and paste this prompt to Claude Code:\n\n");
 
-    farmTerm.box("Prompt for Claude", [
-      "Hey Claude, I am using the Farmwork framework,",
-      "please go through the justfile and create",
-      "project-specific commands, and go through my",
-      "app and suggest project-specific subagents",
-      "that would work well.",
-    ], "secondary");
+    farmTerm.box(
+      "Prompt for Claude",
+      [
+        "Hey Claude, I am using the Farmwork framework,",
+        "please go through the justfile and create",
+        "project-specific commands, and go through my",
+        "app and suggest project-specific subagents",
+        "that would work well.",
+      ],
+      "secondary",
+    );
 
     // Show merge prompt if we backed up CLAUDE.md
     if (answers._didBackupClaudeMd) {
       farmTerm.nl();
       farmTerm.section("Merge Your Old Instructions", "🥬");
-      farmTerm.gray("  Your old CLAUDE.md was backed up. Use this prompt to merge:\n\n");
+      farmTerm.gray(
+        "  Your old CLAUDE.md was backed up. Use this prompt to merge:\n\n",
+      );
 
-      farmTerm.box("Merge Prompt", [
-        "Hey Claude, look at my CLAUDE.md file and",
-        "merge the project-specific instructions from",
-        "OLD_CLAUDE.md into it, so I have one file",
-        "with all the Farmwork instructions plus my",
-        "original project setup. Then delete the OLD",
-        "files when done.",
-      ], "accent");
+      farmTerm.box(
+        "Merge Prompt",
+        [
+          "Hey Claude, look at my CLAUDE.md file and",
+          "merge the project-specific instructions from",
+          "OLD_CLAUDE.md into it, so I have one file",
+          "with all the Farmwork instructions plus my",
+          "original project setup. Then delete the OLD",
+          "files when done.",
+        ],
+        "accent",
+      );
     }
 
     // Final tractor drive
     farmTerm.nl();
     await farmTerm.tractorAnimation("Your farm is ready!", 1500);
     farmTerm.nl();
-
   } catch (error) {
     farmTerm.error("Failed to initialize Farmwork");
     console.error(error);
@@ -476,11 +540,10 @@ Run these in order for a complete development cycle:
 
 | Phrase | Action |
 |--------|--------|
-| **till the land** | Audit systems, update \`_AUDIT/FARMHOUSE.md\` with current metrics |
-| **inspect the farm** | Full inspection: code review, cleanup, performance, security, code quality |
-| **go to market** | i18n scan + translator for missing translations |
-| **harvest crops** | Execute \`/push\` (lint, test, build, commit, push) |
-| **open the farm** | Full audit cycle (everything except push), then ask to proceed |
+| **open the farm** | Audit systems, update \`_AUDIT/FARMHOUSE.md\` with current metrics |
+| **count the herd** | Full inspection + dry run: code review, cleanup, performance, security, code quality, accessibility |
+| **go to market** | i18n scan + accessibility audit for missing translations and a11y issues |
+| **close the farm** | Execute \`/push\` (lint, test, build, commit, push) |
 
 ---
 
@@ -495,28 +558,30 @@ Run these in order for a complete development cycle:
 
 ### Farmwork Phrase Details
 
-**till the land**
+**open the farm**
 1. Launch \`the-farmer\` agent to audit all systems
 2. Run \`bd list --status closed | wc -l\` to get total completed issues
 3. Updates \`_AUDIT/FARMHOUSE.md\` with current metrics
 
-**inspect the farm** (Full Inspection)
-Runs all inspection agents in parallel:
+**count the herd** (Full Audit Cycle)
+Runs all inspection agents in parallel, then dry run quality gates. No push.
+
 1. **Code Review & Cleanup** - \`code-reviewer\` + \`unused-code-cleaner\`
-2. **Performance Audit** - Tests + \`performance-auditor\`, updates \`_AUDIT/PERFORMANCE.md\`
+2. **Performance Audit** - \`performance-auditor\`, updates \`_AUDIT/PERFORMANCE.md\`
 3. **Security Audit** - \`security-auditor\` for OWASP Top 10, updates \`_AUDIT/SECURITY.md\`
 4. **Code Quality** - \`code-smell-auditor\` for DRY violations, updates \`_AUDIT/CODE_QUALITY.md\`
-5. **Summary Report** - Consolidate findings
+5. **Accessibility** - \`accessibility-auditor\` for WCAG 2.1, updates \`_AUDIT/ACCESSIBILITY.md\`
+6. **Dry Run** - lint, tests, build (but NOT commit/push)
+7. **Summary Report** - Consolidate findings, ask user next steps
 
-**harvest crops**
+**go to market**
+1. Scan for hardcoded text not using i18n
+2. Launch \`i18n-locale-translator\` agent
+3. Launch \`accessibility-auditor\` for WCAG 2.1 compliance
+4. Updates \`_AUDIT/ACCESSIBILITY.md\`
+
+**close the farm**
 - Invoke the \`push\` skill immediately
-
-**open the farm** (Full Audit Cycle)
-1. **Till the Land** - Run \`the-farmer\` agent
-2. **Inspect the Farm** - Full inspection (code review, cleanup, performance, security, code quality)
-3. **Dry Run Harvest** - Run lint, tests, build (but NOT commit/push)
-4. **Summary Report** - Present consolidated findings
-5. **Ask User** - Ready to harvest (push)?
 
 ---
 
@@ -573,7 +638,7 @@ async function createFarmhouseMd(cwd, answers) {
   const content = `# Farmwork Farmhouse
 
 > Central command for the Farmwork agentic harness.
-> Updated automatically by \`the-farmer\` agent during \`/push\` or via "till the land" phrase.
+> Updated automatically by \`the-farmer\` agent during \`/push\` or via "open the farm" phrase.
 
 **Last Updated:** ${today}
 **Score:** 5.0/10
@@ -585,8 +650,8 @@ async function createFarmhouseMd(cwd, answers) {
 
 | Metric | Count |
 |--------|-------|
-| Commands | 2 |
-| Agents | 9 |
+| Commands | 1 |
+| Agents | 10 |
 | Justfile Recipes | 10 |
 | Unit Tests | 0 |
 | E2E Tests | 0 |
@@ -604,8 +669,7 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 
 | Command | Description |
 |---------|-------------|
-| \`/push\` | Clean, lint, test, build, commit, push |
-| \`/open-the-farm\` | Full audit cycle, then ask user next steps |
+| \`/push\` | Clean, lint, test, build, commit, push, update metrics |
 
 ---
 
@@ -618,6 +682,7 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 | \`security-auditor\` | OWASP vulnerability scanning |
 | \`performance-auditor\` | Performance anti-patterns |
 | \`code-smell-auditor\` | DRY violations, complexity, naming |
+| \`accessibility-auditor\` | WCAG 2.1 compliance, alt text, contrast |
 | \`unused-code-cleaner\` | Detect and remove dead code |
 | \`code-cleaner\` | Remove comments and console.logs |
 | \`i18n-locale-translator\` | Translate UI text to locales |
@@ -631,11 +696,10 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 
 | Phrase | Action |
 |--------|--------|
-| \`till the land\` | Audit systems, update FARMHOUSE.md |
-| \`inspect the farm\` | Full inspection: code review, cleanup, performance, security, code quality |
-| \`go to market\` | i18n scan + translator |
-| \`harvest crops\` | Execute /push |
-| \`open the farm\` | Full audit cycle |
+| \`open the farm\` | Audit systems, update FARMHOUSE.md |
+| \`count the herd\` | Full inspection + dry run (no push) |
+| \`go to market\` | i18n scan + accessibility audit |
+| \`close the farm\` | Execute /push |
 
 ### Plan Phrases
 
@@ -679,10 +743,31 @@ async function createAuditDocs(cwd, answers) {
   const today = new Date().toISOString().split("T")[0];
 
   const audits = [
-    { name: "SECURITY.md", title: "Security Audit", description: "Security posture and vulnerability tracking" },
-    { name: "PERFORMANCE.md", title: "Performance Audit", description: "Performance metrics and optimization tracking" },
-    { name: "CODE_QUALITY.md", title: "Code Quality Audit", description: "Code quality and standards tracking" },
-    { name: "TESTS.md", title: "Test Coverage Audit", description: "Test coverage and gaps tracking" },
+    {
+      name: "SECURITY.md",
+      title: "Security Audit",
+      description: "Security posture and vulnerability tracking",
+    },
+    {
+      name: "PERFORMANCE.md",
+      title: "Performance Audit",
+      description: "Performance metrics and optimization tracking",
+    },
+    {
+      name: "ACCESSIBILITY.md",
+      title: "Accessibility Audit",
+      description: "WCAG 2.1 Level AA compliance tracking",
+    },
+    {
+      name: "CODE_QUALITY.md",
+      title: "Code Quality Audit",
+      description: "Code quality and standards tracking",
+    },
+    {
+      name: "TESTS.md",
+      title: "Test Coverage Audit",
+      description: "Test coverage and gaps tracking",
+    },
   ];
 
   for (const audit of audits) {
@@ -920,6 +1005,26 @@ Scans for code quality issues:
 Reports code health as GOOD / FAIR / NEEDS ATTENTION.
 Updates \`_AUDIT/CODE_QUALITY.md\` with results.
 `,
+    "accessibility-auditor.md": `---
+name: accessibility-auditor
+description: WCAG 2.1 accessibility auditing for React/Next.js applications
+tools: Read, Grep, Glob, Edit
+model: haiku
+---
+
+# Accessibility Auditor Agent
+
+Scans for WCAG 2.1 Level AA compliance issues:
+- Missing or inadequate alt text on images
+- Color contrast issues
+- Keyboard navigation problems
+- Missing ARIA labels and roles
+- Form accessibility (labels, error messages)
+- Focus management issues
+
+Reports findings by severity (CRITICAL, HIGH, MEDIUM, LOW).
+Updates \`_AUDIT/ACCESSIBILITY.md\` with results.
+`,
     "unused-code-cleaner.md": `---
 name: unused-code-cleaner
 description: Detect and remove unused code (imports, functions, variables)
@@ -1006,201 +1111,130 @@ async function createCommands(cwd, answers) {
   const storybookSteps = answers.includeStorybook
     ? `
 
-### Step 6: Build & Deploy Storybook
+### Step 9: Deploy Storybook to Netlify
 
-Build Storybook for production:
-\`\`\`bash
-${pm} run build-storybook
-\`\`\`
-
-Deploy to Netlify (requires NETLIFY_AUTH_TOKEN and NETLIFY_STORYBOOK_SITE_ID in .claude/settings.local.json):
+Deploy the Storybook documentation site:
 \`\`\`bash
 npx netlify deploy --dir=storybook-static --site=$NETLIFY_STORYBOOK_SITE_ID --prod
 \`\`\`
+
+Note: Requires \`NETLIFY_AUTH_TOKEN\` and \`NETLIFY_STORYBOOK_SITE_ID\` in \`.claude/settings.local.json\`.
+If not configured, skip this step and inform the user to add the env vars.
 
 Storybook URL: https://${answers.storybookUrl || "storybook.example.com"}
 ${answers.passwordProtect ? "**Note:** This Storybook is password protected." : ""}
 `
     : "";
 
-  const finalStep = answers.includeStorybook
-    ? "### Step 7: Report Success"
-    : "### Step 6: Report Success";
-  const reportContent = answers.includeStorybook
-    ? `
-Show summary:
-- Files changed
-- Commit hash
-- Push status
-- Storybook deploy status
-`
-    : `
-Show summary:
-- Files changed
-- Commit hash
-- Push status
-`;
-
   const pushCommand = `---
-description: Clean, lint, test, build, commit, and push${answers.includeStorybook ? " (+ deploy Storybook)" : ""}
-allowed-tools: Bash(git:*), Bash(${pm}:*), Bash(npx:*)
+description: Clean, stage, lint, test, build, commit, push, and update metrics
+argument-hint: [optional: commit message override]
+allowed-tools: Bash(find:*), Bash(git:*), Bash(${pm}:*), Bash(npx:*)${answers.includeStorybook ? ", Bash(npx netlify:*)" : ""}, Task
 ---
 
 # Push Command
 
-Run quality gates, commit changes, and push to remote.${answers.includeStorybook ? " Then deploy Storybook." : ""}
+Run code cleanup, all quality gates, commit changes, and push to remote.
 
 ## Workflow
 
 Execute these steps in order. **Stop immediately if any step fails.**
 
-### Step 1: Stage All Changes
+### Step 1: Clean Up System Files
+Remove any .DS_Store files from the repository:
+\`\`\`bash
+find . -name '.DS_Store' -type f -delete
+\`\`\`
+
+### Step 2: Sync Packages
+Clean and reinstall node_modules to ensure package-lock.json stays in sync:
+\`\`\`bash
+rm -rf node_modules && ${pm} install
+\`\`\`
+This prevents \`${pm} ci\` failures in CI/CD due to lock file drift.
+
+If package-lock.json was modified, it will be staged in the next step.
+
+### Step 3: Stage All Changes
 \`\`\`bash
 git add -A
 \`\`\`
 
-### Step 2: Check for Changes
-Run \`git status\` to verify there are staged changes. If nothing to commit, stop.
+### Step 4: Check for Changes
+Run \`git status\` to verify there are staged changes. If nothing to commit, inform the user and stop.
 
-### Step 3: Run Quality Gates
+### Step 5: Clean Code
 
-1. **Lint**: \`${answers.lintCommand}\`
-2. **Tests**: \`${answers.testCommand}\`
-3. **Build**: \`${answers.buildCommand}\`
+Run the code-cleaner agent on staged TypeScript files to remove comments and console.logs.
 
-### Step 4: Generate Commit Message
+This removes:
+- Line comments (\`//\`) and block comments (\`/* */\`)
+- \`console.log\` statements
 
-Analyze staged changes and generate a concise commit message:
-- Starts with a type (feat, fix, refactor, docs, style, test, chore)
-- Summarizes the "why" not the "what"
-- 1-2 sentences maximum
+It preserves:
+- JSDoc comments (\`/** */\`)
+- \`console.error\`, \`console.warn\`, \`console.info\`
 
-### Step 5: Commit and Push
-
-Create the commit with footer:
-
-\`\`\`
-🌽 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
+After cleaning, re-stage the modified files:
+\`\`\`bash
+git add -A
 \`\`\`
 
-Then push: \`git push\`
+### Step 6: Run Quality Gates (in order)
+
+Run each check. If any fails, stop and report which check failed:
+
+1. **Lint**: \`${answers.lintCommand}\`${answers.includeStorybook ? `\n2. **Storybook**: \`${pm} run build-storybook\`` : ""}
+${answers.includeStorybook ? "3" : "2"}. **Unit Tests**: \`${answers.testCommand}\`
+${answers.includeStorybook ? "4" : "3"}. **Build**: \`${answers.buildCommand}\`
+
+### Step 7: Generate Commit Message
+
+If \`$ARGUMENTS\` is provided, use it as the commit message.
+
+Otherwise, analyze the staged changes:
+1. Run \`git diff --cached --stat\` to see changed files
+2. Run \`git diff --cached\` to see actual changes
+3. Run \`git log -5 --oneline\` to match the repository's commit style
+4. Generate a concise, descriptive commit message that:
+   - Starts with a type (feat, fix, refactor, docs, style, test, chore)
+   - Summarizes the "why" not the "what"
+   - Is 1-2 sentences maximum
+
+### Step 8: Commit and Push
+
+Create the commit with the message, including the standard footer:
+
+\`\`\`
+🌽 Generated with FARMWORK
+\`\`\`
+
+Then push to remote:
+\`\`\`bash
+git push
+\`\`\`
 ${storybookSteps}
-${finalStep}
-${reportContent}`;
+### Step 10: Update Farmhouse Metrics
+
+Run the-farmer agent to update \`_AUDIT/FARMHOUSE.md\` with current metrics:
+- Commands and agents inventory
+- Test counts (unit, e2e)
+- Completed issues count
+
+This keeps the harness documentation in sync with the codebase.
+
+### Step 11: Report Success
+
+Show a summary:
+- Files changed
+- Commit hash
+- Push status${answers.includeStorybook ? "\n- Storybook deploy status (if deployed)" : ""}
+- Harness metrics updated
+`;
 
   await fs.writeFile(
     path.join(cwd, ".claude", "commands", "push.md"),
     pushCommand,
-  );
-
-  // Create open-the-farm command
-  const openTheFarmCommand = `---
-description: Full audit cycle - till, inspect, dry run harvest, then ask user next steps
-allowed-tools: Bash(${pm}:*), Bash(just:*), Task
----
-
-# Open the Farm Command
-
-Complete development audit workflow. Runs all audits and quality checks without committing, then asks the user what to do next.
-
-Trigger phrase: "open the farm"
-
-## Workflow
-
-Execute these steps in order. Track findings from each step for the final summary.
-
-### Step 1: Till the Land
-
-Update the harness documentation with current metrics.
-
-Launch the \`the-farmer\` agent to audit and update \`_AUDIT/FARMHOUSE.md\`:
-- Commands and agents inventory
-- Test counts
-- Completed issues count
-
-Record the Farmhouse score for the summary.
-
-### Step 2: Inspect the Farm
-
-Run all inspection agents in parallel for comprehensive code quality check.
-
-#### 2a. Code Review & Cleanup
-Launch these agents in parallel:
-- \`code-reviewer\` agent on recently modified files
-- \`unused-code-cleaner\` to detect dead code, unused imports
-
-#### 2b. Performance Audit
-- Launch \`performance-auditor\` agent for anti-patterns
-
-#### 2c. Security Audit
-- Launch \`security-auditor\` agent for OWASP Top 10 vulnerabilities
-- Note findings by severity (CRITICAL, HIGH, MEDIUM, LOW)
-
-#### 2d. Code Quality Audit
-- Launch \`code-smell-auditor\` agent for DRY violations, complexity, naming issues
-- Note code health rating (GOOD / FAIR / NEEDS ATTENTION)
-
-### Step 3: Dry Run Harvest
-
-Run quality gates WITHOUT committing or pushing:
-
-1. **Lint**: \`${answers.lintCommand}\`
-2. **Tests**: \`${answers.testCommand}\`
-3. **Build**: \`${answers.buildCommand}\`
-
-Record pass/fail status for each gate.
-
-### Step 4: Summary Report
-
-Present a consolidated report of all findings:
-
-\`\`\`
-## Farm Audit Complete
-
-### Harness Status
-- Farmhouse Score: X/10
-- Commands: X | Agents: X | Tests: X
-
-### Code Quality
-- Security: X issues (Y critical, Z high)
-- Performance: X issues
-- Code Smells: [GOOD/FAIR/NEEDS ATTENTION]
-- Unused Code: X items flagged
-
-### Quality Gates
-- Lint: ✅/❌
-- Tests: ✅/❌ (X passed, Y failed)
-- Build: ✅/❌
-
-### Open Items
-[List top 3-5 issues that should be addressed]
-\`\`\`
-
-### Step 5: Ask User
-
-After presenting the summary, ask:
-
-> "All audits complete. What would you like to do?"
->
-> Options:
-> - **harvest crops** - Commit and push all changes
-> - **review audits** - Show detailed findings from a specific audit
-> - **fix issues first** - Address the open items before pushing
-
-Wait for user response before proceeding.
-
-## Notes
-
-- This command does NOT modify files or commit changes
-- All audit agents update their respective \`_AUDIT/*.md\` files
-- Use this before major releases or after significant development
-`;
-
-  await fs.writeFile(
-    path.join(cwd, ".claude", "commands", "open-the-farm.md"),
-    openTheFarmCommand,
   );
 }
 
@@ -1257,7 +1291,7 @@ async function createProduceConfig(cwd, answers) {
       storybook: answers.includeStorybook || false,
       i18n: answers.includeI18n || false,
     },
-    audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "CODE_QUALITY", "TESTS"],
+    audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "ACCESSIBILITY", "CODE_QUALITY", "TESTS"],
   };
 
   if (answers.includeStorybook) {
