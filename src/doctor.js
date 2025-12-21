@@ -121,7 +121,7 @@ export async function doctor() {
   const checks = [];
 
   // Core Files
-  checks.push({ category: "Core Files", emoji: "📁", items: [] });
+  checks.push({ category: "Core Files", emoji: "🌾", items: [] });
   checks[0].items.push(
     checkExists(path.join(cwd, "CLAUDE.md"), "CLAUDE.md exists"),
   );
@@ -131,7 +131,7 @@ export async function doctor() {
   checks[0].items.push(checkClaudeMdSections(path.join(cwd, "CLAUDE.md")));
 
   // Agents & Commands
-  checks.push({ category: "Agents & Commands", emoji: "🤖", items: [] });
+  checks.push({ category: "Agents & Commands", emoji: "🐴", items: [] });
   checks[1].items.push(
     checkDirectoryNotEmpty(
       path.join(cwd, ".claude", "agents"),
@@ -146,7 +146,7 @@ export async function doctor() {
   );
 
   // Audit System
-  checks.push({ category: "Audit System", emoji: "📊", items: [] });
+  checks.push({ category: "Audit System", emoji: "🦉", items: [] });
   checks[2].items.push(
     checkExists(path.join(cwd, "_AUDIT"), "_AUDIT/ directory exists"),
   );
@@ -164,21 +164,21 @@ export async function doctor() {
   );
 
   // Navigation
-  checks.push({ category: "Navigation", emoji: "🧭", items: [] });
+  checks.push({ category: "Navigation", emoji: "🐓", items: [] });
   checks[3].items.push(
     checkExists(path.join(cwd, "justfile"), "justfile exists"),
   );
   checks[3].items.push(checkCommand("just", "just command available"));
 
   // Issue Tracking
-  checks.push({ category: "Issue Tracking", emoji: "🎫", items: [] });
+  checks.push({ category: "Issue Tracking", emoji: "🐷", items: [] });
   checks[4].items.push(
     checkExists(path.join(cwd, ".beads"), ".beads/ directory exists"),
   );
   checks[4].items.push(checkCommand("bd", "bd (beads) command available"));
 
   // Security
-  checks.push({ category: "Security", emoji: "🔒", items: [] });
+  checks.push({ category: "Security", emoji: "🐕", items: [] });
   checks[5].items.push(checkGitignore(cwd));
 
   let totalPassed = 0;
@@ -213,7 +213,7 @@ export async function doctor() {
   // Summary
   farmTerm.nl();
   farmTerm.divider("═", 50);
-  farmTerm.section("Diagnosis Summary", "🩺");
+  farmTerm.section("Diagnosis Summary", "🐮");
 
   farmTerm.metric("Passed", totalPassed, emojis.seedling);
   if (totalWarnings > 0) {

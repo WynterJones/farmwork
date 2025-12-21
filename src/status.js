@@ -109,18 +109,18 @@ export async function status() {
 
   // Component Counts Section
   farmTerm.section("Component Counts", emojis.corn);
-  farmTerm.metric("Agents", agents, "🤖");
-  farmTerm.metric("Commands", commands, "⚡");
-  farmTerm.metric("Justfile Recipes", recipes, "📋");
-  farmTerm.metric("Audit Docs", audits, "📊");
-  farmTerm.metric("Plans", plans, "📝");
+  farmTerm.metric("Agents", agents, emojis.horse);
+  farmTerm.metric("Commands", commands, emojis.bee);
+  farmTerm.metric("Justfile Recipes", recipes, emojis.sheep);
+  farmTerm.metric("Audit Docs", audits, emojis.wheat);
+  farmTerm.metric("Plans", plans, emojis.sunflower);
 
   // Issue Tracking Section
   if (fs.existsSync(beadsDir)) {
     const beads = getBeadsStatus(cwd);
-    farmTerm.section("Issue Tracking", emojis.tools);
-    farmTerm.metric("Open Issues", beads.open, "🔴");
-    farmTerm.metric("Closed Issues", beads.closed, "✅");
+    farmTerm.section("Issue Tracking", emojis.pig);
+    farmTerm.metric("Open Issues", beads.open, emojis.apple);
+    farmTerm.metric("Closed Issues", beads.closed, emojis.lettuce);
 
     if (beads.open + beads.closed > 0) {
       const completionRate = Math.round((beads.closed / (beads.open + beads.closed)) * 100);
@@ -143,7 +143,7 @@ export async function status() {
     .filter((f) => f.data !== null && f.data.score !== null);
 
   if (auditData.length > 0) {
-    farmTerm.section("Audit Scores", emojis.magnify);
+    farmTerm.section("Audit Scores", emojis.owl);
 
     for (const audit of auditData) {
       farmTerm.score(audit.label, audit.data.score, 10);
@@ -185,12 +185,12 @@ export async function status() {
   const storyFiles = countFiles(cwd, "*.stories.tsx");
 
   if (testFiles > 0 || storyFiles > 0) {
-    farmTerm.section("Project Metrics", emojis.star);
+    farmTerm.section("Project Metrics", emojis.sunflower);
     if (testFiles > 0) {
-      farmTerm.metric("Test Files", testFiles, "🧪");
+      farmTerm.metric("Test Files", testFiles, emojis.potato);
     }
     if (storyFiles > 0) {
-      farmTerm.metric("Storybook Stories", storyFiles, "📖");
+      farmTerm.metric("Storybook Stories", storyFiles, emojis.cow);
     }
   }
 
@@ -200,10 +200,10 @@ export async function status() {
 
   farmTerm.phrases([
     { phrase: "till the land", description: "Audit systems, update FARMHOUSE.md", emoji: emojis.seedling },
-    { phrase: "inspect the farm", description: "Full code review & quality audit", emoji: emojis.magnify },
-    { phrase: "go to market", description: "Scan & translate missing i18n", emoji: emojis.cart },
+    { phrase: "inspect the farm", description: "Full code review & quality audit", emoji: emojis.owl },
+    { phrase: "go to market", description: "Scan & translate missing i18n", emoji: emojis.basket },
     { phrase: "harvest crops", description: "Lint, test, build, commit, push", emoji: emojis.tractor },
-    { phrase: "open the farm", description: "Full audit cycle", emoji: emojis.farm },
+    { phrase: "open the farm", description: "Full audit cycle", emoji: emojis.barn },
   ]);
 
   farmTerm.gray("  Run `farmwork doctor` to check for issues.\n\n");

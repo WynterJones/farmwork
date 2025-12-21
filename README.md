@@ -1,10 +1,10 @@
-<img src="/logo.png" alt="Farmwork - Developer Methodology" width="200" />
+<img src="/logo.png" alt="Farmwork - Developer Methodology" width="500" />
 
-# FARMWORK 
+# FARMWORK
 
 > A workflow framework for Claude Code
 
-...because building software should feel like tending a well-organized farm. 
+...because building software should feel like tending a well-organized farm.
 
 ## Installation
 
@@ -21,14 +21,9 @@ npx farmwork init
 ## Quick Start
 
 ```bash
-# Initialize in your project
 cd your-project
 farmwork init
-
-# Check your setup
 farmwork doctor
-
-# View framework status
 farmwork status
 ```
 
@@ -36,11 +31,10 @@ farmwork status
 
 ### `farmwork init`
 
-Initialize the Farmwork framework in your current directory. Runs an interactive setup wizard to configure your project for any tech stack.
+Start setting up the new digital farm:
 
 ```bash
 farmwork init                    # Interactive setup wizard
-farmwork init -f                 # Force overwrite existing files
 ```
 
 **Options:**
@@ -57,29 +51,20 @@ If you enable Storybook (for React/Vue projects), the wizard will also ask for:
 - `CLAUDE.md` - Main instructions and phrase commands
 - `.claude/` - Claude Code configuration directory
   - `settings.json` - Project settings
-  - `agents/` - Specialized subagents
-  - `commands/` - User-invocable skills
+  - `agents/` - 9 specialized subagents
+  - `commands/` - 2 user-invocable skills
 - `_AUDIT/` - Living audit documents
   - `FARMHOUSE.md` - Framework command center
+  - `SECURITY.md` - Security posture tracking
+  - `PERFORMANCE.md` - Performance metrics
+  - `CODE_QUALITY.md` - Code quality tracking
+  - `TESTS.md` - Test coverage tracking
 - `_PLANS/` - Implementation plans directory
 - `justfile` - Navigation and task commands
 
-### `farmwork add <type> <name>`
-
-Add a new component to your Farmwork setup.
-
-```bash
-farmwork add agent code-reviewer     # Add a new agent
-farmwork add command deploy          # Add a new command
-farmwork add audit performance       # Add a new audit document
-```
-
-**Types:**
-- `agent` - Creates `.claude/agents/<name>.md`
-- `command` - Creates `.claude/commands/<name>.md`
-- `audit` - Creates `_AUDIT/<NAME>.md`
-
 ### `farmwork status`
+
+<img src="/status.png" alt="Farmwork Status" width="500" />
 
 Display Farmwork status and metrics.
 
@@ -94,7 +79,11 @@ farmwork status
 - Configuration file status
 - Project metrics (tests, stories)
 
+<img src="/status2.png" alt="Farmwork Status Details" width="500" />
+
 ### `farmwork doctor`
+
+<img src="/doctor.png" alt="Farmwork Doctor" width="500" />
 
 Check your Farmwork setup and diagnose issues.
 
@@ -124,22 +113,50 @@ farmwork doctor
 ### Phrase Commands
 
 **Farmwork Phrases** (Development Workflow):
-- `till the land` - Audit systems, update metrics
-- `inspect the farm` - Full inspection (code review, performance, security, quality)
-- `go to market` - i18n translation check
-- `harvest crops` - Full push workflow
+| Phrase | Action |
+|--------|--------|
+| `till the land` | Audit systems, update FARMHOUSE.md metrics |
+| `inspect the farm` | Full inspection (code review, performance, security, quality) |
+| `go to market` | i18n translation check |
+| `harvest crops` | Full push workflow (lint, test, build, commit, push) |
+| `open the farm` | Full audit cycle, then ask to proceed |
 
 **Plan Phrases**:
-- `make a plan for...` - Create implementation plan
-- `let's implement...` - Execute plan with issue tracking
+| Phrase | Action |
+|--------|--------|
+| `make a plan for...` | Create implementation plan in `_PLANS/` |
+| `let's implement...` | Execute plan with issue tracking |
+
+### Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/push` | Stage, lint, test, build, commit, push |
+| `/open-the-farm` | Full audit cycle with summary report |
+
+### Agents
+
+9 specialized agents included:
+
+| Agent | Purpose |
+|-------|---------|
+| `the-farmer` | Audit and update FARMHOUSE.md metrics |
+| `code-reviewer` | Quality & security code review |
+| `security-auditor` | OWASP vulnerability scanning |
+| `performance-auditor` | Memory leaks, re-renders, anti-patterns |
+| `code-smell-auditor` | DRY violations, complexity, naming |
+| `unused-code-cleaner` | Detect and remove dead code |
+| `code-cleaner` | Remove comments and console.logs |
+| `i18n-locale-translator` | Translate UI text to locales |
+| `storybook-maintainer` | Create/update Storybook stories |
 
 ### Recommended Workflow
 
 1. **Start Session**: Run `till the land` to audit current state
 2. **Plan Work**: Use `make a plan for...` for new features
 3. **Implement**: Use `let's implement...` to execute with tracking
-4. **Quality Check**: Run `inspect the farm`
-5. **Ship**: Run `harvest crops` to push changes
+4. **Quality Check**: Run `inspect the farm` or `/open-the-farm`
+5. **Ship**: Run `harvest crops` or `/push` to push changes
 
 ## Directory Structure
 
@@ -147,22 +164,28 @@ farmwork doctor
 your-project/
 ├── CLAUDE.md           # Main instructions & phrase commands
 ├── .claude/            # Claude Code configuration
-│   ├── settings.json   # Project settings
-│   ├── agents/         # Specialized subagents
+│   ├── agents/         # 9 specialized subagents
+│   │   ├── the-farmer.md
 │   │   ├── code-reviewer.md
 │   │   ├── security-auditor.md
-│   │   └── ...
+│   │   ├── performance-auditor.md
+│   │   ├── code-smell-auditor.md
+│   │   ├── unused-code-cleaner.md
+│   │   ├── code-cleaner.md
+│   │   ├── i18n-locale-translator.md
+│   │   └── storybook-maintainer.md
 │   └── commands/       # User-invocable skills
 │       ├── push.md
-│       └── ...
+│       └── open-the-farm.md
 ├── _AUDIT/             # Living audit documents
 │   ├── FARMHOUSE.md    # Framework command center
-│   ├── SECURITY.md
-│   ├── PERFORMANCE.md
-│   └── ...
+│   ├── SECURITY.md     # Security posture
+│   ├── PERFORMANCE.md  # Performance metrics
+│   ├── CODE_QUALITY.md # Code quality tracking
+│   └── TESTS.md        # Test coverage
 ├── _PLANS/             # Implementation plans
 │   └── FEATURE_NAME.md
-├── .beads/             # Issue tracking (optional)
+├── .beads/             # Issue tracking
 └── justfile            # Navigation commands
 ```
 
@@ -170,7 +193,7 @@ your-project/
 
 - Node.js 18+
 - [just](https://github.com/casey/just) (recommended for navigation)
-- [beads](https://github.com/steveyegge/beads) (optional, for issue tracking)
+- [beads](https://github.com/steveyegge/beads) (for issue tracking)
 
 ## License
 

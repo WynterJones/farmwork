@@ -585,8 +585,8 @@ async function createFarmhouseMd(cwd, answers) {
 
 | Metric | Count |
 |--------|-------|
-| Commands | 1 |
-| Agents | 4 |
+| Commands | 2 |
+| Agents | 9 |
 | Justfile Recipes | 10 |
 | Unit Tests | 0 |
 | E2E Tests | 0 |
@@ -605,6 +605,7 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 | Command | Description |
 |---------|-------------|
 | \`/push\` | Clean, lint, test, build, commit, push |
+| \`/open-the-farm\` | Full audit cycle, then ask user next steps |
 
 ---
 
@@ -616,6 +617,11 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 | \`code-reviewer\` | Quality & security code review |
 | \`security-auditor\` | OWASP vulnerability scanning |
 | \`performance-auditor\` | Performance anti-patterns |
+| \`code-smell-auditor\` | DRY violations, complexity, naming |
+| \`unused-code-cleaner\` | Detect and remove dead code |
+| \`code-cleaner\` | Remove comments and console.logs |
+| \`i18n-locale-translator\` | Translate UI text to locales |
+| \`storybook-maintainer\` | Create/update Storybook stories |
 
 ---
 
@@ -860,8 +866,8 @@ Reports findings with severity (CRITICAL, HIGH, MEDIUM, LOW) and remediation ste
     "security-auditor.md": `---
 name: security-auditor
 description: OWASP security vulnerability scanning
-tools: Read, Grep, Glob
-model: sonnet
+tools: Read, Grep, Glob, Edit
+model: haiku
 ---
 
 # Security Auditor Agent
@@ -879,8 +885,8 @@ Updates \`_AUDIT/SECURITY.md\` with results.
     "performance-auditor.md": `---
 name: performance-auditor
 description: Find memory leaks, unnecessary re-renders, and anti-patterns
-tools: Read, Grep, Glob
-model: sonnet
+tools: Read, Grep, Glob, Edit
+model: haiku
 ---
 
 # Performance Auditor Agent
@@ -894,6 +900,98 @@ Scans for performance anti-patterns:
 
 Reports findings with impact assessment.
 Updates \`_AUDIT/PERFORMANCE.md\` with results.
+`,
+    "code-smell-auditor.md": `---
+name: code-smell-auditor
+description: Detect DRY violations, complexity issues, naming problems, and technical debt
+tools: Read, Grep, Glob, Edit
+model: haiku
+---
+
+# Code Smell Auditor Agent
+
+Scans for code quality issues:
+- DRY violations (duplicated code)
+- Complexity issues (functions > 50 lines, deep nesting)
+- Naming issues (misleading names, abbreviations)
+- Magic values (hardcoded numbers/strings)
+- Technical debt (TODO, FIXME, HACK comments)
+
+Reports code health as GOOD / FAIR / NEEDS ATTENTION.
+Updates \`_AUDIT/CODE_QUALITY.md\` with results.
+`,
+    "unused-code-cleaner.md": `---
+name: unused-code-cleaner
+description: Detect and remove unused code (imports, functions, variables)
+tools: Read, Write, Edit, Bash, Grep, Glob
+model: haiku
+---
+
+# Unused Code Cleaner Agent
+
+Detects and removes unused code:
+- Unused imports
+- Unused functions and classes
+- Unused variables
+- Dead code paths
+- Console.log statements (optional)
+- Comments (preserves JSDoc)
+
+Use after refactoring, when removing features, or before production deployment.
+`,
+    "code-cleaner.md": `---
+name: code-cleaner
+description: Fast removal of comments, console.logs, and debug code while preserving JSDoc
+tools: Read, Edit, Glob, Grep
+model: haiku
+---
+
+# Code Cleaner Agent
+
+Fast cleanup of TypeScript/JavaScript files:
+
+## Removes
+- Line comments (\`//\`)
+- Block comments (\`/* */\`)
+- \`console.log\` statements
+
+## Preserves
+- JSDoc comments (\`/** */\`)
+- \`console.error\`, \`console.warn\`, \`console.info\`
+`,
+    "i18n-locale-translator.md": `---
+name: i18n-locale-translator
+description: Translate UI text content into English (en) and Japanese (jp) using i18n locale system
+tools: Read, Write, Edit, Glob, Grep
+model: sonnet
+---
+
+# i18n Locale Translator Agent
+
+Handles internationalization tasks:
+- Extract hardcoded text from components
+- Create translation keys in locale files
+- Translate content to English and Japanese
+- Update components to use translation hooks
+
+Use when adding new features or internationalizing existing hardcoded text.
+`,
+    "storybook-maintainer.md": `---
+name: storybook-maintainer
+description: Create and update Storybook stories for UI components
+tools: Read, Write, Edit, Glob, Grep
+model: haiku
+---
+
+# Storybook Maintainer Agent
+
+Manages Storybook stories for UI components:
+- Analyze component props and variants
+- Create comprehensive story files
+- Document component usage
+- Add controls for interactive props
+
+Use when adding new components or when existing components change significantly.
 `,
   };
 
@@ -995,6 +1093,114 @@ ${reportContent}`;
   await fs.writeFile(
     path.join(cwd, ".claude", "commands", "push.md"),
     pushCommand,
+  );
+
+  // Create open-the-farm command
+  const openTheFarmCommand = `---
+description: Full audit cycle - till, inspect, dry run harvest, then ask user next steps
+allowed-tools: Bash(${pm}:*), Bash(just:*), Task
+---
+
+# Open the Farm Command
+
+Complete development audit workflow. Runs all audits and quality checks without committing, then asks the user what to do next.
+
+Trigger phrase: "open the farm"
+
+## Workflow
+
+Execute these steps in order. Track findings from each step for the final summary.
+
+### Step 1: Till the Land
+
+Update the harness documentation with current metrics.
+
+Launch the \`the-farmer\` agent to audit and update \`_AUDIT/FARMHOUSE.md\`:
+- Commands and agents inventory
+- Test counts
+- Completed issues count
+
+Record the Farmhouse score for the summary.
+
+### Step 2: Inspect the Farm
+
+Run all inspection agents in parallel for comprehensive code quality check.
+
+#### 2a. Code Review & Cleanup
+Launch these agents in parallel:
+- \`code-reviewer\` agent on recently modified files
+- \`unused-code-cleaner\` to detect dead code, unused imports
+
+#### 2b. Performance Audit
+- Launch \`performance-auditor\` agent for anti-patterns
+
+#### 2c. Security Audit
+- Launch \`security-auditor\` agent for OWASP Top 10 vulnerabilities
+- Note findings by severity (CRITICAL, HIGH, MEDIUM, LOW)
+
+#### 2d. Code Quality Audit
+- Launch \`code-smell-auditor\` agent for DRY violations, complexity, naming issues
+- Note code health rating (GOOD / FAIR / NEEDS ATTENTION)
+
+### Step 3: Dry Run Harvest
+
+Run quality gates WITHOUT committing or pushing:
+
+1. **Lint**: \`${answers.lintCommand}\`
+2. **Tests**: \`${answers.testCommand}\`
+3. **Build**: \`${answers.buildCommand}\`
+
+Record pass/fail status for each gate.
+
+### Step 4: Summary Report
+
+Present a consolidated report of all findings:
+
+\`\`\`
+## Farm Audit Complete
+
+### Harness Status
+- Farmhouse Score: X/10
+- Commands: X | Agents: X | Tests: X
+
+### Code Quality
+- Security: X issues (Y critical, Z high)
+- Performance: X issues
+- Code Smells: [GOOD/FAIR/NEEDS ATTENTION]
+- Unused Code: X items flagged
+
+### Quality Gates
+- Lint: ✅/❌
+- Tests: ✅/❌ (X passed, Y failed)
+- Build: ✅/❌
+
+### Open Items
+[List top 3-5 issues that should be addressed]
+\`\`\`
+
+### Step 5: Ask User
+
+After presenting the summary, ask:
+
+> "All audits complete. What would you like to do?"
+>
+> Options:
+> - **harvest crops** - Commit and push all changes
+> - **review audits** - Show detailed findings from a specific audit
+> - **fix issues first** - Address the open items before pushing
+
+Wait for user response before proceeding.
+
+## Notes
+
+- This command does NOT modify files or commit changes
+- All audit agents update their respective \`_AUDIT/*.md\` files
+- Use this before major releases or after significant development
+`;
+
+  await fs.writeFile(
+    path.join(cwd, ".claude", "commands", "open-the-farm.md"),
+    openTheFarmCommand,
   );
 }
 
