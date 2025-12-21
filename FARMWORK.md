@@ -48,7 +48,6 @@ your-project/
 ├── .claude/                # Claude Code configuration
 │   ├── commands/           # User-invocable skills (/command)
 │   ├── agents/             # Specialized subagents
-│   └── settings.json       # Project settings
 └── justfile                # Navigation & task commands
 ```
 

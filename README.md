@@ -34,9 +34,9 @@ npx farmwork init
 1. **FARMHOUSE.md** - Central command for tracking framework metrics
 2. **Phrase Commands** - Natural language triggers for workflows
 3. **Agents** - Specialized AI subagents for specific tasks
-4. **Commands** - User-invocable skills (triggered with `/command`)
-5. **Issue Tracking** - Using beads (`bd`) for full visibility
-6. **Living Audits** - Documents that track ongoing concerns
+4. **Autonomously Issue Tracking** - Using beads (`bd`) for full visibility
+5. **Living Audits** - Documents that track ongoing concerns
+6. **Plan & Implement** - You describe the outcome, the rest is handled, tracked and audited
 
 ### Phrase Commands
 
@@ -144,7 +144,6 @@ If you enable Storybook (for React/Vue projects), the wizard will also ask for:
 **Creates:**
 - `CLAUDE.md` - Main instructions and phrase commands
 - `.claude/` - Claude Code configuration directory
-  - `settings.json` - Project settings
   - `agents/` - 10 specialized subagents
   - `commands/` - 1 user-invocable skill (/push)
 - `_AUDIT/` - Living audit documents
@@ -207,5 +206,5 @@ MIT
 
 ## Links
 
-- [Farmwork Documentation](https://farmwork.wynter.ai)
-- [GitHub Repository](https://github.com/wynterjones/farmwork)
+- [Farmwork Website](https://farmwork.dev)
+- [Wynter Jones](https://wynter.ai)

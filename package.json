@@ -1,8 +1,8 @@
 {
   "name": "farmwork",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
-  "description": "Farmwork - Agentic development harness for AI-assisted projects",
+  "description": "Farmwork - A workflow framework for Claude Code by Wynter Jones",
   "main": "src/index.js",
   "bin": {
     "farmwork": "./bin/farmwork.js"
