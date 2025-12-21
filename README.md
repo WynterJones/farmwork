@@ -1,10 +1,6 @@
 <img src="/init.png" alt="Farmwork - Developer Methodology" width="500" />
 
-# FARMWORK
-
 > A workflow framework for Claude Code by Wynter Jones
-
-...because building software should feel like tending a well-organized farm.
 
 ## Quick Start
 
