@@ -2,7 +2,6 @@
 
 import { program } from 'commander';
 import { init } from '../src/init.js';
-import { add } from '../src/add.js';
 import { status } from '../src/status.js';
 import { doctor } from '../src/doctor.js';
 import chalk from 'chalk';
@@ -25,11 +24,6 @@ program
   .description('Initialize Farmwork in current directory')
   .option('-f, --force', 'Overwrite existing files')
   .action(init);
-
-program
-  .command('add <type> <name>')
-  .description('Add a component (agent, command, audit)')
-  .action(add);
 
 program
   .command('status')

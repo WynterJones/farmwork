@@ -1,15 +1,12 @@
 import inquirer from "inquirer";
-import chalk from "chalk";
-import ora from "ora";
 import fs from "fs-extra";
 import path from "path";
 import { fileURLToPath } from "url";
+import { farmTerm, emojis } from "./terminal.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const TEMPLATES_DIR = path.join(__dirname, "..", "templates");
 
-// Try to detect package.json info
 function detectPackageJson() {
   try {
     const pkgPath = path.join(process.cwd(), "package.json");
@@ -32,19 +29,19 @@ const QUESTIONS = [
   {
     type: "input",
     name: "projectName",
-    message: "Project name:",
+    message: "🌱 Project name:",
     default: path.basename(process.cwd()),
   },
   {
     type: "list",
     name: "packageManager",
-    message: "Package manager:",
+    message: "🧺 Package manager:",
     choices: ["npm", "yarn", "pnpm", "bun"],
   },
   {
     type: "input",
     name: "testCommand",
-    message: "Test command:",
+    message: "🥒 Test command:",
     default: (answers) => {
       const { scripts } = detectPackageJson();
       const pm = answers.packageManager;
@@ -56,7 +53,7 @@ const QUESTIONS = [
   {
     type: "input",
     name: "buildCommand",
-    message: "Build command:",
+    message: "🌽 Build command:",
     default: (answers) => {
       const { scripts } = detectPackageJson();
       const pm = answers.packageManager;
@@ -67,7 +64,7 @@ const QUESTIONS = [
   {
     type: "input",
     name: "lintCommand",
-    message: "Lint command:",
+    message: "🦉 Lint command:",
     default: (answers) => {
       const { scripts } = detectPackageJson();
       const pm = answers.packageManager;
@@ -78,13 +75,13 @@ const QUESTIONS = [
   {
     type: "confirm",
     name: "includeStorybook",
-    message: "Include Storybook support? (React/Vue component docs)",
+    message: "🐄 Include Storybook support?",
     default: () => detectPackageJson().hasStorybook,
   },
   {
     type: "confirm",
     name: "includeI18n",
-    message: "Include i18n support? (multi-language translations)",
+    message: "🌻 Include i18n support?",
     default: false,
   },
 ];
@@ -93,27 +90,27 @@ const STORYBOOK_QUESTIONS = [
   {
     type: "input",
     name: "storybookUrl",
-    message: "Storybook URL (e.g., storybook.yoursite.com):",
+    message: "🌿 Storybook URL:",
     default: "storybook.example.com",
   },
   {
     type: "input",
     name: "netlifyAuthToken",
-    message: "Netlify Auth Token (from netlify.com/user/applications):",
+    message: "🗝️ Netlify Auth Token:",
     validate: (input) =>
       input.length > 0 || "Auth token is required for deployment",
   },
   {
     type: "input",
     name: "netlifySiteId",
-    message: "Netlify Site ID (from site settings):",
+    message: "🏷️ Netlify Site ID:",
     validate: (input) =>
       input.length > 0 || "Site ID is required for deployment",
   },
   {
     type: "confirm",
     name: "passwordProtect",
-    message: "Password protect Storybook? (Recommended for private components)",
+    message: "🐕 Password protect Storybook?",
     default: true,
   },
 ];
@@ -121,78 +118,97 @@ const STORYBOOK_QUESTIONS = [
 export async function init(options) {
   const cwd = process.cwd();
 
-  console.log(chalk.cyan("\n🌽 Farmwork Initialization\n"));
+  // Show animated logo
+  await farmTerm.logoAnimated();
+
+  // Check if farmwork is already installed
+  const claudeDir = path.join(cwd, ".claude");
+  const farmworkConfig = path.join(cwd, ".farmwork.json");
+  const claudeMd = path.join(cwd, "CLAUDE.md");
+
+  const isAlreadyInstalled = fs.existsSync(claudeDir) &&
+    (fs.existsSync(farmworkConfig) || fs.existsSync(claudeMd));
+
+  if (isAlreadyInstalled && !options.force) {
+    farmTerm.warn("Farmwork is already installed in this project!");
+    farmTerm.nl();
+
+    // Show what's detected
+    farmTerm.gray("  Detected:\n");
+    if (fs.existsSync(claudeDir)) farmTerm.gray("    • .claude/ directory\n");
+    if (fs.existsSync(claudeMd)) farmTerm.gray("    • CLAUDE.md\n");
+    if (fs.existsSync(farmworkConfig)) farmTerm.gray("    • .farmwork.json\n");
+    farmTerm.nl();
+
+    const { continueInit } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "continueInit",
+        message: "What would you like to do?",
+        choices: [
+          { name: "🐴 Re-initialize (will backup existing files)", value: "reinit" },
+          { name: "🐮 Run doctor instead (check health)", value: "doctor" },
+          { name: "🌾 Run status instead (view metrics)", value: "status" },
+          { name: "🐔 Exit", value: "exit" }
+        ]
+      }
+    ]);
+
+    if (continueInit === "exit") {
+      farmTerm.info("No changes made. Your farm is safe! 🌾\n");
+      return;
+    }
+
+    if (continueInit === "doctor") {
+      farmTerm.nl();
+      const { doctor } = await import("./doctor.js");
+      await doctor();
+      return;
+    }
+
+    if (continueInit === "status") {
+      farmTerm.nl();
+      const { status } = await import("./status.js");
+      await status();
+      return;
+    }
+
+    // continueInit === "reinit" - proceed with force
+    options.force = true;
+    farmTerm.nl();
+  }
+
+  farmTerm.header("FARMWORK INITIALIZATION", "primary");
+  farmTerm.info("Let's set up your farm! Answer a few questions to get started.\n");
 
   const answers = await inquirer.prompt(QUESTIONS);
 
-  // Ask Storybook deployment questions if Storybook is enabled
+  // Storybook configuration
   if (answers.includeStorybook) {
-    console.log(chalk.cyan("\n🍇 Storybook Deployment Configuration\n"));
-    console.log(
-      chalk.gray(
-        "We recommend deploying Storybook to Netlify with password protection.",
-      ),
-    );
-    console.log(
-      chalk.gray(
-        "This keeps your component documentation private while accessible to your team.\n",
-      ),
-    );
+    farmTerm.nl();
+    farmTerm.section("Storybook Deployment", "🐄");
+    farmTerm.gray("  We recommend deploying Storybook to Netlify with password protection.\n");
+    farmTerm.gray("  This keeps your component docs private but accessible to your team.\n\n");
 
     const storybookAnswers = await inquirer.prompt(STORYBOOK_QUESTIONS);
     Object.assign(answers, storybookAnswers);
 
     if (answers.passwordProtect) {
-      console.log(
-        chalk.yellow("\n🍋 Remember to enable password protection in Netlify:"),
-      );
-      console.log(
-        chalk.gray("   Site settings → Access control → Password protection"),
-      );
+      farmTerm.nl();
+      farmTerm.warn("Remember to enable password protection in Netlify:");
+      farmTerm.gray("  Site settings → Access control → Password protection\n");
     }
   }
 
-  // Check for existing files that would be overwritten
+  // Check for existing files
   const existingFiles = [];
   const filesToCheck = [
-    {
-      path: path.join(cwd, "CLAUDE.md"),
-      name: "CLAUDE.md",
-      backup: "OLD_CLAUDE.md",
-    },
-    {
-      path: path.join(cwd, "justfile"),
-      name: "justfile",
-      backup: "OLD_justfile",
-    },
-    {
-      path: path.join(cwd, ".farmwork.json"),
-      name: ".farmwork.json",
-      backup: null,
-    },
-    {
-      path: path.join(cwd, ".claude", "settings.json"),
-      name: ".claude/settings.json",
-      backup: ".claude/OLD_settings.json",
-    },
-    {
-      path: path.join(cwd, ".claude", "commands"),
-      name: ".claude/commands/",
-      backup: null,
-      isDir: true,
-    },
-    {
-      path: path.join(cwd, ".claude", "agents"),
-      name: ".claude/agents/",
-      backup: null,
-      isDir: true,
-    },
-    {
-      path: path.join(cwd, "_AUDIT"),
-      name: "_AUDIT/",
-      backup: null,
-      isDir: true,
-    },
+    { path: path.join(cwd, "CLAUDE.md"), name: "CLAUDE.md", backup: "OLD_CLAUDE.md" },
+    { path: path.join(cwd, "justfile"), name: "justfile", backup: "OLD_justfile" },
+    { path: path.join(cwd, ".farmwork.json"), name: ".farmwork.json", backup: null },
+    { path: path.join(cwd, ".claude", "commands"), name: ".claude/commands/", backup: null, isDir: true },
+    { path: path.join(cwd, ".claude", "agents"), name: ".claude/agents/", backup: null, isDir: true },
+    { path: path.join(cwd, "_AUDIT"), name: "_AUDIT/", backup: null, isDir: true },
   ];
 
   for (const file of filesToCheck) {
@@ -204,17 +220,23 @@ export async function init(options) {
   let didBackupClaudeMd = false;
 
   if (existingFiles.length > 0 && !options.force) {
-    console.log(chalk.yellow("\n🍋 The following files/folders already exist:"));
+    farmTerm.nl();
+    farmTerm.warn("The following files/folders already exist:");
+    farmTerm.nl();
+
     for (const file of existingFiles) {
       if (file.isDir) {
-        console.log(chalk.gray(`   - ${file.name}`) + chalk.dim(" (will add new files)"));
+        farmTerm.gray(`    ${file.name}`);
+        farmTerm.cyan(" (will add new files)\n");
       } else if (file.backup) {
-        console.log(chalk.gray(`   - ${file.name}`) + chalk.dim(` (will backup to ${file.backup})`));
+        farmTerm.gray(`    ${file.name}`);
+        farmTerm.yellow(` → ${file.backup}\n`);
       } else {
-        console.log(chalk.gray(`   - ${file.name}`) + chalk.dim(" (will overwrite)"));
+        farmTerm.gray(`    ${file.name}`);
+        farmTerm.red(" (will overwrite)\n");
       }
     }
-    console.log("");
+    farmTerm.nl();
 
     const { overwriteChoice } = await inquirer.prompt([
       {
@@ -222,291 +244,197 @@ export async function init(options) {
         name: "overwriteChoice",
         message: "How would you like to proceed?",
         choices: [
-          {
-            name: "Continue (backup files, add to existing folders)",
-            value: "overwrite",
-          },
-          { name: "Cancel installation", value: "cancel" },
+          { name: "🌱 Continue (backup files, add to existing folders)", value: "overwrite" },
+          { name: "🐔 Cancel installation", value: "cancel" },
         ],
       },
     ]);
 
     if (overwriteChoice === "cancel") {
-      console.log(chalk.gray("\nInstallation cancelled."));
+      farmTerm.nl();
+      farmTerm.gray("  Installation cancelled.\n\n");
       process.exit(0);
     }
 
-    // Backup files that have backup paths
-    console.log("");
+    // Backup files
+    farmTerm.nl();
     for (const file of existingFiles) {
       if (file.backup) {
         const backupPath = path.join(cwd, file.backup);
         await fs.copy(file.path, backupPath);
-        console.log(chalk.gray(`   Backed up ${file.name} → ${file.backup}`));
+        farmTerm.status(`Backed up ${file.name} → ${file.backup}`, "pass");
         if (file.name === "CLAUDE.md") {
           didBackupClaudeMd = true;
         }
       }
     }
-    console.log("");
   }
 
-  // Store for use in final output
   answers._didBackupClaudeMd = didBackupClaudeMd;
 
-  const spinner = ora("Creating Farmwork structure...").start();
+  // Planting animation
+  farmTerm.nl();
+  farmTerm.section("Planting Your Farm", emojis.seedling);
 
   try {
-    // Create folder structure
-    await fs.ensureDir(path.join(cwd, "_AUDIT"));
-    await fs.ensureDir(path.join(cwd, "_PLANS"));
-    await fs.ensureDir(path.join(cwd, ".claude", "commands"));
-    await fs.ensureDir(path.join(cwd, ".claude", "agents"));
+    // Create folder structure with animations
+    const steps = [
+      { name: "Creating directories", fn: async () => {
+        await fs.ensureDir(path.join(cwd, "_AUDIT"));
+        await fs.ensureDir(path.join(cwd, "_PLANS"));
+        await fs.ensureDir(path.join(cwd, ".claude", "commands"));
+        await fs.ensureDir(path.join(cwd, ".claude", "agents"));
+      }},
+      { name: "Planting CLAUDE.md", fn: () => createClaudeMd(cwd, answers) },
+      { name: "Building FARMHOUSE.md", fn: () => createFarmhouseMd(cwd, answers) },
+      { name: "Creating audit documents", fn: () => createAuditDocs(cwd, answers) },
+      { name: "Laying out justfile", fn: () => createJustfile(cwd, answers) },
+      { name: "Training agents", fn: () => createAgents(cwd, answers) },
+      { name: "Setting up commands", fn: () => createCommands(cwd, answers) },
+      { name: "Configuring settings", fn: () => createSettings(cwd, answers) },
+      { name: "Writing .farmwork.json", fn: () => createProduceConfig(cwd, answers) },
+    ];
 
-    spinner.text = "Creating CLAUDE.md...";
-    await createClaudeMd(cwd, answers);
+    for (const step of steps) {
+      await farmTerm.spin(step.name, step.fn);
+    }
 
-    spinner.text = "Creating FARMHOUSE.md...";
-    await createFarmhouseMd(cwd, answers);
+    // Install dependencies
+    farmTerm.nl();
+    farmTerm.section("Installing Tools", emojis.horse);
 
-    spinner.text = "Creating audit documents...";
-    await createAuditDocs(cwd, answers);
-
-    spinner.text = "Creating justfile...";
-    await createJustfile(cwd, answers);
-
-    spinner.text = "Creating core agents...";
-    await createAgents(cwd, answers);
-
-    spinner.text = "Creating core commands...";
-    await createCommands(cwd, answers);
-
-    spinner.text = "Creating settings...";
-    await createSettings(cwd, answers);
-
-    spinner.text = "Creating .farmwork.json...";
-    await createProduceConfig(cwd, answers);
-
-    // Check and install just if needed
-    spinner.text = "Checking for just command runner...";
-    try {
+    // Check and install just
+    await farmTerm.spin("Checking for just command runner", async () => {
       const { execSync } = await import("child_process");
       try {
         execSync("which just", { stdio: "ignore" });
       } catch {
-        spinner.text = "Installing just...";
         try {
-          // Try brew first (macOS), then cargo
           try {
-            execSync("brew install just", { stdio: "inherit" });
-            console.log(
-              chalk.green("\n🌱 Just installed successfully via Homebrew"),
-            );
+            execSync("brew install just", { stdio: "pipe" });
           } catch {
-            execSync("cargo install just", { stdio: "inherit" });
-            console.log(
-              chalk.green("\n🌱 Just installed successfully via Cargo"),
-            );
+            execSync("cargo install just", { stdio: "pipe" });
           }
         } catch {
-          console.log(
-            chalk.yellow("\n🍋 Could not install just automatically."),
-          );
-          console.log(chalk.gray("   Install manually: brew install just"));
-          console.log(chalk.gray("   Or see: https://github.com/casey/just"));
+          farmTerm.warn("Could not install just automatically.");
+          farmTerm.gray("    Install manually: brew install just\n");
         }
       }
-    } catch (e) {
-      // Silently continue if check fails
-    }
+    });
 
-    spinner.text = "Setting up beads issue tracking...";
-    try {
+    // Check and install beads
+    await farmTerm.spin("Setting up beads issue tracking", async () => {
       const { execSync } = await import("child_process");
-
-      // Check if bd is installed
       try {
         execSync("which bd", { stdio: "ignore" });
       } catch {
-        // bd not found, try to install it (npm first, then brew, then cargo)
-        spinner.text = "Installing beads (bd)...";
         let installed = false;
-
-        // Try npm first (most common)
         try {
-          execSync("npm install -g @beads/bd", { stdio: "inherit" });
-          console.log(chalk.green("\n🌱 Beads installed successfully via npm"));
+          execSync("npm install -g @beads/bd", { stdio: "pipe" });
           installed = true;
         } catch {
-          // Try homebrew
           try {
-            execSync("brew install steveyegge/beads/bd", { stdio: "inherit" });
-            console.log(
-              chalk.green("\n🌱 Beads installed successfully via Homebrew"),
-            );
+            execSync("brew install steveyegge/beads/bd", { stdio: "pipe" });
             installed = true;
           } catch {
-            // Try cargo as last resort
             try {
-              execSync("cargo install beads", { stdio: "inherit" });
-              console.log(
-                chalk.green("\n🌱 Beads installed successfully via Cargo"),
-              );
+              execSync("cargo install beads", { stdio: "pipe" });
               installed = true;
             } catch {
               // All methods failed
             }
           }
         }
-
         if (!installed) {
-          console.log(
-            chalk.yellow("\n🍋 Could not install beads automatically."),
-          );
-          console.log(
-            chalk.gray("   Install manually: npm install -g @beads/bd"),
-          );
-          console.log(chalk.gray("   Or: brew install steveyegge/beads/bd"));
-          console.log(
-            chalk.gray("   Or see: https://github.com/steveyegge/beads"),
-          );
+          farmTerm.warn("Could not install beads automatically.");
+          farmTerm.gray("    Install manually: npm install -g @beads/bd\n");
         }
       }
 
-      // Initialize beads in the project
-      spinner.text = "Initializing beads...";
+      // Initialize beads
       try {
         execSync("bd init", { cwd, stdio: "ignore" });
       } catch {
-        // bd init might fail if already initialized or not installed
+        // bd init might fail if already initialized
       }
 
-      // Clean up beads-generated agent files (we use CLAUDE.md instead)
-      spinner.text = "Cleaning up beads defaults...";
+      // Clean up beads-generated files
       const beadsAgentFiles = ["AGENTS.md", "@AGENTS.md"];
       for (const file of beadsAgentFiles) {
-        const filePath = path.join(cwd, file);
         try {
-          await fs.remove(filePath);
+          await fs.remove(path.join(cwd, file));
         } catch {
-          // File doesn't exist, ignore
+          // File doesn't exist
         }
       }
-    } catch (e) {
-      console.log(
-        chalk.yellow(
-          "\n🍋 Could not set up beads. Install with: cargo install beads",
-        ),
-      );
-    }
+    });
 
-    spinner.succeed(chalk.green("Farmwork initialized!"));
+    // Success!
+    farmTerm.nl();
+    farmTerm.divider("═", 50);
+    farmTerm.success("Farmwork initialized successfully!");
 
-    console.log(chalk.cyan("\n🌱 Created structure:"));
-    console.log(`   ${chalk.green("🌱")} _AUDIT/`);
-    console.log(`   ${chalk.green("🌱")} _PLANS/`);
-    console.log(`   ${chalk.green("🌱")} .claude/commands/`);
-    console.log(`   ${chalk.green("🌱")} .claude/agents/`);
-    console.log(`   ${chalk.green("🌱")} CLAUDE.md`);
-    console.log(`   ${chalk.green("🌱")} justfile`);
-    console.log(`   ${chalk.green("🌱")} .farmwork.json`);
+    // Show created structure
+    farmTerm.section("Created Structure", emojis.corn);
+    await farmTerm.planting([
+      "_AUDIT/",
+      "_PLANS/",
+      ".claude/commands/",
+      ".claude/agents/",
+      "CLAUDE.md",
+      "justfile",
+      ".farmwork.json",
+    ], "Files planted");
 
-    console.log(chalk.cyan("\n🥕 Next steps:"));
-    console.log(
-      `   1. Run ${chalk.yellow("just --list")} to see available commands`,
-    );
-    console.log(
-      `   2. Say ${chalk.yellow('"till the land"')} to Claude to audit your setup`,
-    );
-    console.log(
-      `   3. Say ${chalk.yellow('"make a plan for <feature>"')} to start planning`,
-    );
+    // Next steps
+    farmTerm.section("Next Steps", emojis.carrot);
+    farmTerm.nl();
+    farmTerm.white("  1. ");
+    farmTerm.yellow("just --list");
+    farmTerm.gray(" → See available commands\n");
+    farmTerm.white("  2. ");
+    farmTerm.yellow('"till the land"');
+    farmTerm.gray(" → Audit your setup\n");
+    farmTerm.white("  3. ");
+    farmTerm.yellow('"make a plan for <feature>"');
+    farmTerm.gray(" → Start planning\n");
 
-    console.log(chalk.cyan("\n🌾 Now let Claude Code get comfortable!"));
-    console.log(chalk.gray("   Copy and paste this prompt to Claude Code:\n"));
-    console.log(
-      chalk.white(
-        "   ┌─────────────────────────────────────────────────────────────────────────┐",
-      ),
-    );
-    console.log(
-      chalk.white("   │") +
-        chalk.yellow(
-          " Hey Claude, I am using the Farmwork framework, please go through the    ",
-        ) +
-        chalk.white("│"),
-    );
-    console.log(
-      chalk.white("   │") +
-        chalk.yellow(
-          " justfile and create project-specific commands, and go through my app    ",
-        ) +
-        chalk.white("│"),
-    );
-    console.log(
-      chalk.white("   │") +
-        chalk.yellow(
-          " and suggest any project-specific subagents that would work well.        ",
-        ) +
-        chalk.white("│"),
-    );
-    console.log(
-      chalk.white(
-        "   └─────────────────────────────────────────────────────────────────────────┘",
-      ),
-    );
+    // Claude prompt box
+    farmTerm.nl();
+    farmTerm.section("Get Claude Comfortable", emojis.wheat);
+    farmTerm.gray("  Copy and paste this prompt to Claude Code:\n\n");
+
+    farmTerm.box("Prompt for Claude", [
+      "Hey Claude, I am using the Farmwork framework,",
+      "please go through the justfile and create",
+      "project-specific commands, and go through my",
+      "app and suggest project-specific subagents",
+      "that would work well.",
+    ], "secondary");
 
     // Show merge prompt if we backed up CLAUDE.md
     if (answers._didBackupClaudeMd) {
-      console.log(chalk.cyan("\n🥬 Merge your old instructions!"));
-      console.log(
-        chalk.gray(
-          "   Your old CLAUDE.md was backed up. Use this prompt to merge:\n",
-        ),
-      );
-      console.log(
-        chalk.white(
-          "   ┌─────────────────────────────────────────────────────────────────────────┐",
-        ),
-      );
-      console.log(
-        chalk.white("   │") +
-          chalk.yellow(
-            " Hey Claude, look at my CLAUDE.md file and merge the project-specific   ",
-          ) +
-          chalk.white("│"),
-      );
-      console.log(
-        chalk.white("   │") +
-          chalk.yellow(
-            " instructions from OLD_CLAUDE.md into it, so I have one file with all   ",
-          ) +
-          chalk.white("│"),
-      );
-      console.log(
-        chalk.white("   │") +
-          chalk.yellow(
-            " the Farmwork framework instructions plus my original project setup.    ",
-          ) +
-          chalk.white("│"),
-      );
-      console.log(
-        chalk.white("   │") +
-          chalk.yellow(
-            " Then delete OLD_CLAUDE.md when done. Same for OLD_justfile. Thank you.                                   ",
-          ) +
-          chalk.white("│"),
-      );
-      console.log(
-        chalk.white(
-          "   └─────────────────────────────────────────────────────────────────────────┘",
-        ),
-      );
+      farmTerm.nl();
+      farmTerm.section("Merge Your Old Instructions", "🥬");
+      farmTerm.gray("  Your old CLAUDE.md was backed up. Use this prompt to merge:\n\n");
+
+      farmTerm.box("Merge Prompt", [
+        "Hey Claude, look at my CLAUDE.md file and",
+        "merge the project-specific instructions from",
+        "OLD_CLAUDE.md into it, so I have one file",
+        "with all the Farmwork instructions plus my",
+        "original project setup. Then delete the OLD",
+        "files when done.",
+      ], "accent");
     }
 
-    console.log("");
+    // Final tractor drive
+    farmTerm.nl();
+    await farmTerm.tractorAnimation("Your farm is ready!", 1500);
+    farmTerm.nl();
+
   } catch (error) {
-    spinner.fail(chalk.red("Failed to initialize Farmwork"));
+    farmTerm.error("Failed to initialize Farmwork");
     console.error(error);
     process.exit(1);
   }
@@ -745,26 +673,10 @@ async function createAuditDocs(cwd, answers) {
   const today = new Date().toISOString().split("T")[0];
 
   const audits = [
-    {
-      name: "SECURITY.md",
-      title: "Security Audit",
-      description: "Security posture and vulnerability tracking",
-    },
-    {
-      name: "PERFORMANCE.md",
-      title: "Performance Audit",
-      description: "Performance metrics and optimization tracking",
-    },
-    {
-      name: "CODE_QUALITY.md",
-      title: "Code Quality Audit",
-      description: "Code quality and standards tracking",
-    },
-    {
-      name: "TESTS.md",
-      title: "Test Coverage Audit",
-      description: "Test coverage and gaps tracking",
-    },
+    { name: "SECURITY.md", title: "Security Audit", description: "Security posture and vulnerability tracking" },
+    { name: "PERFORMANCE.md", title: "Performance Audit", description: "Performance metrics and optimization tracking" },
+    { name: "CODE_QUALITY.md", title: "Code Quality Audit", description: "Code quality and standards tracking" },
+    { name: "TESTS.md", title: "Test Coverage Audit", description: "Test coverage and gaps tracking" },
   ];
 
   for (const audit of audits) {
@@ -993,7 +905,6 @@ Updates \`_AUDIT/PERFORMANCE.md\` with results.
 async function createCommands(cwd, answers) {
   const pm = answers.packageManager || "npm";
 
-  // Build Storybook deployment steps if enabled
   const storybookSteps = answers.includeStorybook
     ? `
 
@@ -1088,20 +999,6 @@ ${reportContent}`;
 }
 
 async function createSettings(cwd, answers) {
-  const settings = {
-    permissions: {
-      allow: [],
-      deny: [],
-      ask: [],
-    },
-  };
-
-  await fs.writeFile(
-    path.join(cwd, ".claude", "settings.json"),
-    JSON.stringify(settings, null, 2),
-  );
-
-  // Create local settings for sensitive data (gitignored)
   if (answers.includeStorybook && answers.netlifyAuthToken) {
     const localSettings = {
       env: {
@@ -1115,7 +1012,6 @@ async function createSettings(cwd, answers) {
       JSON.stringify(localSettings, null, 2),
     );
 
-    // Ensure settings.local.json is gitignored
     const gitignorePath = path.join(cwd, ".gitignore");
     let gitignoreContent = "";
     try {
@@ -1158,7 +1054,6 @@ async function createProduceConfig(cwd, answers) {
     audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "CODE_QUALITY", "TESTS"],
   };
 
-  // Add Storybook configuration if enabled
   if (answers.includeStorybook) {
     config.storybook = {
       url: answers.storybookUrl || null,

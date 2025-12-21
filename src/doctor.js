@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
-import chalk from "chalk";
 import { execSync } from "child_process";
+import { farmTerm, emojis } from "./terminal.js";
 
 function checkExists(filePath, description) {
   const exists = fs.existsSync(filePath);
@@ -54,8 +54,7 @@ function checkClaudeMdSections(claudeMdPath) {
   const content = fs.readFileSync(claudeMdPath, "utf8");
   const requiredSections = [
     "Phrase Commands",
-    "Issue Tracking",
-    "Claude Code Commands",
+    "Issue-First Workflow",
   ];
 
   const missing = requiredSections.filter(
@@ -115,27 +114,24 @@ function checkGitignore(cwd) {
 export async function doctor() {
   const cwd = process.cwd();
 
-  console.log(chalk.cyan("\n🩺 Farmwork Doctor\n"));
-  console.log(chalk.gray("Checking your Farmwork setup...\n"));
+  farmTerm.logo();
+  farmTerm.header("FARMWORK DOCTOR", "accent");
+  await farmTerm.analyzing("Diagnosing project health", 1200);
 
   const checks = [];
 
-  checks.push({ category: "Core Files", items: [] });
+  // Core Files
+  checks.push({ category: "Core Files", emoji: "📁", items: [] });
   checks[0].items.push(
     checkExists(path.join(cwd, "CLAUDE.md"), "CLAUDE.md exists"),
   );
   checks[0].items.push(
     checkExists(path.join(cwd, ".claude"), ".claude/ directory exists"),
   );
-  checks[0].items.push(
-    checkExists(
-      path.join(cwd, ".claude", "settings.json"),
-      "settings.json exists",
-    ),
-  );
   checks[0].items.push(checkClaudeMdSections(path.join(cwd, "CLAUDE.md")));
 
-  checks.push({ category: "Agents & Commands", items: [] });
+  // Agents & Commands
+  checks.push({ category: "Agents & Commands", emoji: "🤖", items: [] });
   checks[1].items.push(
     checkDirectoryNotEmpty(
       path.join(cwd, ".claude", "agents"),
@@ -149,7 +145,8 @@ export async function doctor() {
     ),
   );
 
-  checks.push({ category: "Audit System", items: [] });
+  // Audit System
+  checks.push({ category: "Audit System", emoji: "📊", items: [] });
   checks[2].items.push(
     checkExists(path.join(cwd, "_AUDIT"), "_AUDIT/ directory exists"),
   );
@@ -166,56 +163,67 @@ export async function doctor() {
     checkExists(path.join(cwd, "_PLANS"), "_PLANS/ directory exists"),
   );
 
-  checks.push({ category: "Navigation", items: [] });
+  // Navigation
+  checks.push({ category: "Navigation", emoji: "🧭", items: [] });
   checks[3].items.push(
     checkExists(path.join(cwd, "justfile"), "justfile exists"),
   );
   checks[3].items.push(checkCommand("just", "just command available"));
 
-  checks.push({ category: "Issue Tracking", items: [] });
+  // Issue Tracking
+  checks.push({ category: "Issue Tracking", emoji: "🎫", items: [] });
   checks[4].items.push(
     checkExists(path.join(cwd, ".beads"), ".beads/ directory exists"),
   );
   checks[4].items.push(checkCommand("bd", "bd (beads) command available"));
 
-  checks.push({ category: "Security", items: [] });
+  // Security
+  checks.push({ category: "Security", emoji: "🔒", items: [] });
   checks[5].items.push(checkGitignore(cwd));
 
   let totalPassed = 0;
   let totalFailed = 0;
   let totalWarnings = 0;
 
+  // Run checks with animation
   for (const category of checks) {
-    console.log(chalk.bold(`${category.category}`));
+    farmTerm.section(category.category, category.emoji);
 
     for (const check of category.items) {
+      // Small delay for visual effect
+      await new Promise(r => setTimeout(r, 80));
+
       if (check.passed) {
-        console.log(chalk.green(`  🌱 ${check.message}`));
+        farmTerm.status(check.message, "pass");
         totalPassed++;
       } else {
-        if (check.message.includes("beads") || check.message.includes("bd ")) {
-          console.log(chalk.yellow(`  🍋 ${check.message}`));
-          if (check.details) console.log(chalk.gray(`    ${check.details}`));
+        // Beads-related items are optional (warnings)
+        const isOptional = check.message.includes("beads") || check.message.includes("bd ");
+        if (isOptional) {
+          farmTerm.status(check.message, "warn", check.details || "(optional)");
           totalWarnings++;
         } else {
-          console.log(chalk.red(`  🍂 ${check.message}`));
-          if (check.details) console.log(chalk.gray(`    ${check.details}`));
+          farmTerm.status(check.message, "fail", check.details || "");
           totalFailed++;
         }
       }
     }
-    console.log();
   }
 
-  console.log(chalk.bold("Summary"));
-  console.log(chalk.green(`  🌱 ${totalPassed} passed`));
+  // Summary
+  farmTerm.nl();
+  farmTerm.divider("═", 50);
+  farmTerm.section("Diagnosis Summary", "🩺");
+
+  farmTerm.metric("Passed", totalPassed, emojis.seedling);
   if (totalWarnings > 0) {
-    console.log(chalk.yellow(`  🍋 ${totalWarnings} warnings (optional)`));
+    farmTerm.metric("Warnings", totalWarnings, emojis.leaf);
   }
   if (totalFailed > 0) {
-    console.log(chalk.red(`  🍂 ${totalFailed} failed`));
+    farmTerm.metric("Failed", totalFailed, "🍂");
   }
 
+  // Health Assessment
   const health =
     totalFailed === 0
       ? totalWarnings === 0
@@ -225,20 +233,28 @@ export async function doctor() {
         ? "Needs Attention"
         : "Critical";
 
-  const healthColor =
-    health === "Excellent"
-      ? chalk.green
-      : health === "Good"
-        ? chalk.cyan
-        : health === "Needs Attention"
-          ? chalk.yellow
-          : chalk.red;
+  farmTerm.nl();
+  farmTerm.divider();
 
-  console.log(`\n${chalk.bold("Health:")} ${healthColor(health)}`);
-
-  if (totalFailed > 0) {
-    console.log(chalk.gray("\nRun `farmwork init` to fix missing components."));
+  if (health === "Excellent") {
+    farmTerm.success(`Health: ${health} - Your farm is thriving! 🌳`);
+  } else if (health === "Good") {
+    farmTerm.info(`Health: ${health} - Growing nicely! 🌿`);
+  } else if (health === "Needs Attention") {
+    farmTerm.warn(`Health: ${health} - Some areas need work 🌱`);
+  } else {
+    farmTerm.error(`Health: ${health} - Urgent care needed! 🥀`);
   }
 
-  console.log();
+  if (totalFailed > 0) {
+    farmTerm.nl();
+    farmTerm.info("Run `farmwork init` to fix missing components.");
+  }
+
+  // Health bar visualization
+  const healthPercent = Math.round((totalPassed / (totalPassed + totalFailed + totalWarnings)) * 100);
+  farmTerm.nl();
+  farmTerm.score("Overall Health", healthPercent, 100);
+
+  farmTerm.nl();
 }

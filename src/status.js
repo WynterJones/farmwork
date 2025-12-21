@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
-import chalk from "chalk";
 import { execSync } from "child_process";
+import { farmTerm, emojis } from "./terminal.js";
 
 function countFiles(dir, pattern) {
   try {
@@ -45,25 +45,38 @@ function getBeadsStatus(cwd) {
   }
 }
 
-function readFarmhouse(cwd) {
-  const farmhousePath = path.join(cwd, "_AUDIT", "FARMHOUSE.md");
-  if (!fs.existsSync(farmhousePath)) return null;
+function readAuditFile(cwd, filename) {
+  const filePath = path.join(cwd, "_AUDIT", filename);
+  if (!fs.existsSync(filePath)) return null;
 
   try {
-    const content = fs.readFileSync(farmhousePath, "utf8");
+    const content = fs.readFileSync(filePath, "utf8");
     const scoreMatch = content.match(/\*\*Score:\*\* (\d+\.?\d*)\/10/);
-    const statusMatch = content.match(/\*\*Status:\*\* (\d+) open items/);
+    const statusMatch = content.match(/\*\*Status:\*\* (.+)/);
     const lastUpdatedMatch = content.match(
       /\*\*Last Updated:\*\* (\d{4}-\d{2}-\d{2})/,
     );
 
     return {
       score: scoreMatch ? parseFloat(scoreMatch[1]) : null,
-      openItems: statusMatch ? parseInt(statusMatch[1]) : null,
+      status: statusMatch ? statusMatch[1].trim() : null,
       lastUpdated: lastUpdatedMatch ? lastUpdatedMatch[1] : null,
     };
   } catch {
     return null;
+  }
+}
+
+function countJustfileRecipes(cwd) {
+  const justfilePath = path.join(cwd, "justfile");
+  if (!fs.existsSync(justfilePath)) return 0;
+
+  try {
+    const content = fs.readFileSync(justfilePath, "utf8");
+    const recipes = content.match(/^[a-zA-Z_][a-zA-Z0-9_-]*\s*:/gm);
+    return recipes ? recipes.length : 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -72,12 +85,15 @@ export async function status() {
 
   const claudeDir = path.join(cwd, ".claude");
   if (!fs.existsSync(claudeDir)) {
-    console.log(chalk.red("\n❌ Farmwork not initialized"));
-    console.log(chalk.gray("   Run: farmwork init"));
+    farmTerm.error("Farmwork not initialized");
+    farmTerm.info("Run: farmwork init");
     return;
   }
 
-  console.log(chalk.cyan("\n📊 Farmwork Status\n"));
+  // Header with logo
+  farmTerm.logo();
+  farmTerm.header("FARMWORK STATUS", "primary");
+  await farmTerm.analyzing("Scanning project", 800);
 
   const agentsDir = path.join(claudeDir, "agents");
   const commandsDir = path.join(claudeDir, "commands");
@@ -89,159 +105,106 @@ export async function status() {
   const commands = countMarkdownFiles(commandsDir);
   const audits = countMarkdownFiles(auditDir);
   const plans = countMarkdownFiles(plansDir);
+  const recipes = countJustfileRecipes(cwd);
 
-  console.log(chalk.white("┌─────────────────────────────────────────┐"));
-  console.log(
-    chalk.white("│") +
-      chalk.bold("  Component Counts                       ") +
-      chalk.white("│"),
-  );
-  console.log(chalk.white("├─────────────────────────────────────────┤"));
-  console.log(
-    chalk.white("│") +
-      `  Agents (.claude/agents/)     ${chalk.green(String(agents).padStart(8))} ` +
-      chalk.white("│"),
-  );
-  console.log(
-    chalk.white("│") +
-      `  Commands (.claude/commands/) ${chalk.green(String(commands).padStart(8))} ` +
-      chalk.white("│"),
-  );
-  console.log(
-    chalk.white("│") +
-      `  Audit Docs (_AUDIT/)         ${chalk.green(String(audits).padStart(8))} ` +
-      chalk.white("│"),
-  );
-  console.log(
-    chalk.white("│") +
-      `  Plans (_PLANS/)              ${chalk.yellow(String(plans).padStart(8))} ` +
-      chalk.white("│"),
-  );
-  console.log(chalk.white("└─────────────────────────────────────────┘"));
+  // Component Counts Section
+  farmTerm.section("Component Counts", emojis.corn);
+  farmTerm.metric("Agents", agents, "🤖");
+  farmTerm.metric("Commands", commands, "⚡");
+  farmTerm.metric("Justfile Recipes", recipes, "📋");
+  farmTerm.metric("Audit Docs", audits, "📊");
+  farmTerm.metric("Plans", plans, "📝");
 
+  // Issue Tracking Section
   if (fs.existsSync(beadsDir)) {
     const beads = getBeadsStatus(cwd);
-    console.log(chalk.white("\n┌─────────────────────────────────────────┐"));
-    console.log(
-      chalk.white("│") +
-        chalk.bold("  Issue Tracking (beads)                 ") +
-        chalk.white("│"),
-    );
-    console.log(chalk.white("├─────────────────────────────────────────┤"));
-    console.log(
-      chalk.white("│") +
-        `  Open Issues                  ${chalk.yellow(String(beads.open).padStart(8))} ` +
-        chalk.white("│"),
-    );
-    console.log(
-      chalk.white("│") +
-        `  Closed Issues                ${chalk.green(String(beads.closed).padStart(8))} ` +
-        chalk.white("│"),
-    );
-    console.log(chalk.white("└─────────────────────────────────────────┘"));
+    farmTerm.section("Issue Tracking", emojis.tools);
+    farmTerm.metric("Open Issues", beads.open, "🔴");
+    farmTerm.metric("Closed Issues", beads.closed, "✅");
+
+    if (beads.open + beads.closed > 0) {
+      const completionRate = Math.round((beads.closed / (beads.open + beads.closed)) * 100);
+      farmTerm.nl();
+      farmTerm.score("Completion", completionRate, 100);
+    }
   }
 
-  const farmhouse = readFarmhouse(cwd);
-  if (farmhouse) {
-    console.log(chalk.white("\n┌─────────────────────────────────────────┐"));
-    console.log(
-      chalk.white("│") +
-        chalk.bold("  FARMHOUSE Status                       ") +
-        chalk.white("│"),
-    );
-    console.log(chalk.white("├─────────────────────────────────────────┤"));
-    if (farmhouse.score !== null) {
-      const scoreColor =
-        farmhouse.score >= 8
-          ? chalk.green
-          : farmhouse.score >= 5
-            ? chalk.yellow
-            : chalk.red;
-      console.log(
-        chalk.white("│") +
-          `  Score                        ${scoreColor(String(farmhouse.score + "/10").padStart(8))} ` +
-          chalk.white("│"),
-      );
+  // Audit Scores Section
+  const auditFiles = [
+    { name: "FARMHOUSE.md", label: "Farmhouse" },
+    { name: "CODE_QUALITY.md", label: "Code Quality" },
+    { name: "SECURITY.md", label: "Security" },
+    { name: "PERFORMANCE.md", label: "Performance" },
+    { name: "TESTS.md", label: "Tests" },
+  ];
+
+  const auditData = auditFiles
+    .map((f) => ({ ...f, data: readAuditFile(cwd, f.name) }))
+    .filter((f) => f.data !== null && f.data.score !== null);
+
+  if (auditData.length > 0) {
+    farmTerm.section("Audit Scores", emojis.magnify);
+
+    for (const audit of auditData) {
+      farmTerm.score(audit.label, audit.data.score, 10);
     }
-    if (farmhouse.openItems !== null) {
-      const itemsColor = farmhouse.openItems === 0 ? chalk.green : chalk.yellow;
-      console.log(
-        chalk.white("│") +
-          `  Open Items                   ${itemsColor(String(farmhouse.openItems).padStart(8))} ` +
-          chalk.white("│"),
-      );
-    }
-    if (farmhouse.lastUpdated) {
-      console.log(
-        chalk.white("│") +
-          `  Last Updated                 ${chalk.gray(farmhouse.lastUpdated)} ` +
-          chalk.white("│"),
-      );
-    }
-    console.log(chalk.white("└─────────────────────────────────────────┘"));
+
+    // Calculate average score
+    const avgScore = auditData.reduce((sum, a) => sum + a.data.score, 0) / auditData.length;
+    farmTerm.nl();
+    farmTerm.divider();
+    farmTerm.score("Average Score", avgScore.toFixed(1), 10);
   }
 
+  // Configuration Files Section
   const claudeMd = path.join(cwd, "CLAUDE.md");
   const justfile = path.join(cwd, "justfile");
-  const settingsJson = path.join(claudeDir, "settings.json");
 
-  console.log(chalk.white("\n┌─────────────────────────────────────────┐"));
-  console.log(
-    chalk.white("│") +
-      chalk.bold("  Configuration Files                    ") +
-      chalk.white("│"),
-  );
-  console.log(chalk.white("├─────────────────────────────────────────┤"));
-  console.log(
-    chalk.white("│") +
-      `  CLAUDE.md          ${fs.existsSync(claudeMd) ? chalk.green("        🌱 exists") : chalk.red("        🍂 missing")} ` +
-      chalk.white("│"),
-  );
-  console.log(
-    chalk.white("│") +
-      `  justfile           ${fs.existsSync(justfile) ? chalk.green("        🌱 exists") : chalk.red("        🍂 missing")} ` +
-      chalk.white("│"),
-  );
-  console.log(
-    chalk.white("│") +
-      `  settings.json      ${fs.existsSync(settingsJson) ? chalk.green("        🌱 exists") : chalk.red("        🍂 missing")} ` +
-      chalk.white("│"),
-  );
-  console.log(
-    chalk.white("│") +
-      `  .beads/            ${fs.existsSync(beadsDir) ? chalk.green("        🌱 exists") : chalk.gray("     not configured")} ` +
-      chalk.white("│"),
-  );
-  console.log(chalk.white("└─────────────────────────────────────────┘"));
+  farmTerm.section("Configuration Status", emojis.seedling);
 
-  const testFiles =
-    countFiles(cwd, "*.test.ts") + countFiles(cwd, "*.test.tsx");
+  const configItems = [
+    { label: "CLAUDE.md", exists: fs.existsSync(claudeMd) },
+    { label: "justfile", exists: fs.existsSync(justfile) },
+    { label: ".claude/agents/", exists: fs.existsSync(agentsDir) && agents > 0 },
+    { label: ".claude/commands/", exists: fs.existsSync(commandsDir) && commands > 0 },
+    { label: ".beads/", exists: fs.existsSync(beadsDir), optional: true },
+  ];
+
+  for (const item of configItems) {
+    if (item.exists) {
+      farmTerm.status(item.label, "pass");
+    } else if (item.optional) {
+      farmTerm.status(item.label, "info", "(optional)");
+    } else {
+      farmTerm.status(item.label, "fail", "(missing)");
+    }
+  }
+
+  // Project Metrics Section
+  const testFiles = countFiles(cwd, "*.test.ts") + countFiles(cwd, "*.test.tsx");
   const storyFiles = countFiles(cwd, "*.stories.tsx");
 
   if (testFiles > 0 || storyFiles > 0) {
-    console.log(chalk.white("\n┌─────────────────────────────────────────┐"));
-    console.log(
-      chalk.white("│") +
-        chalk.bold("  Project Metrics                        ") +
-        chalk.white("│"),
-    );
-    console.log(chalk.white("├─────────────────────────────────────────┤"));
+    farmTerm.section("Project Metrics", emojis.star);
     if (testFiles > 0) {
-      console.log(
-        chalk.white("│") +
-          `  Test Files                   ${chalk.green(String(testFiles).padStart(8))} ` +
-          chalk.white("│"),
-      );
+      farmTerm.metric("Test Files", testFiles, "🧪");
     }
     if (storyFiles > 0) {
-      console.log(
-        chalk.white("│") +
-          `  Storybook Stories            ${chalk.green(String(storyFiles).padStart(8))} ` +
-          chalk.white("│"),
-      );
+      farmTerm.metric("Storybook Stories", storyFiles, "📖");
     }
-    console.log(chalk.white("└─────────────────────────────────────────┘"));
   }
 
-  console.log(chalk.gray("\nRun `farmwork doctor` to check for issues.\n"));
+  // ASCII Art and Phrases
+  farmTerm.nl();
+  farmTerm.printTractor();
+
+  farmTerm.phrases([
+    { phrase: "till the land", description: "Audit systems, update FARMHOUSE.md", emoji: emojis.seedling },
+    { phrase: "inspect the farm", description: "Full code review & quality audit", emoji: emojis.magnify },
+    { phrase: "go to market", description: "Scan & translate missing i18n", emoji: emojis.cart },
+    { phrase: "harvest crops", description: "Lint, test, build, commit, push", emoji: emojis.tractor },
+    { phrase: "open the farm", description: "Full audit cycle", emoji: emojis.farm },
+  ]);
+
+  farmTerm.gray("  Run `farmwork doctor` to check for issues.\n\n");
 }

@@ -1,8 +1,10 @@
-# Farmwork
+<img src="/logo.png" alt="Farmwork - Developer Methodology" width="200" />
 
-> Agentic development harness for AI-assisted projects
+# FARMWORK 
 
-Farmwork is a framework that transforms AI coding assistants from reactive tools into proactive development partners. The name is a play on "framework" - because building software should feel like tending a well-organized farm.
+> A workflow framework for Claude Code
+
+...because building software should feel like tending a well-organized farm. 
 
 ## Installation
 
