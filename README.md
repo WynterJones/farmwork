@@ -1,24 +1,16 @@
-<img src="/logo.png" alt="Farmwork - Developer Methodology" width="500" />
+<img src="/init.png" alt="Farmwork - Developer Methodology" width="500" />
 
 # FARMWORK
 
-> A workflow framework for Claude Code
+> A workflow framework for Claude Code by Wynter Jones
 
 ...because building software should feel like tending a well-organized farm.
 
-## Installation
+## Quick Start
 
 ```bash
 npm install -g farmwork
 ```
-
-Or run directly with npx:
-
-```bash
-npx farmwork init
-```
-
-## Quick Start
 
 ```bash
 cd your-project
@@ -27,77 +19,13 @@ farmwork doctor
 farmwork status
 ```
 
-## Commands
-
-### `farmwork init`
-
-Start setting up the new digital farm:
+Or run directly with npx:
 
 ```bash
-farmwork init                    # Interactive setup wizard
+npx farmwork init
 ```
 
-**Options:**
-- `-f, --force` - Overwrite existing files
-
-**Storybook Support:**
-If you enable Storybook (for React/Vue projects), the wizard will also ask for:
-- Storybook URL (e.g., storybook.yoursite.com)
-- Netlify Auth Token (for deployment)
-- Netlify Site ID
-- Password protection preference (recommended)
-
-**Creates:**
-- `CLAUDE.md` - Main instructions and phrase commands
-- `.claude/` - Claude Code configuration directory
-  - `settings.json` - Project settings
-  - `agents/` - 9 specialized subagents
-  - `commands/` - 2 user-invocable skills
-- `_AUDIT/` - Living audit documents
-  - `FARMHOUSE.md` - Framework command center
-  - `SECURITY.md` - Security posture tracking
-  - `PERFORMANCE.md` - Performance metrics
-  - `CODE_QUALITY.md` - Code quality tracking
-  - `TESTS.md` - Test coverage tracking
-- `_PLANS/` - Implementation plans directory
-- `justfile` - Navigation and task commands
-
-### `farmwork status`
-
-<img src="/status.png" alt="Farmwork Status" width="500" />
-
-Display Farmwork status and metrics.
-
-```bash
-farmwork status
-```
-
-**Shows:**
-- Component counts (agents, commands, audits, plans)
-- Issue tracking status (if beads is configured)
-- FARMHOUSE score and open items
-- Configuration file status
-- Project metrics (tests, stories)
-
-<img src="/status2.png" alt="Farmwork Status Details" width="500" />
-
-### `farmwork doctor`
-
-<img src="/doctor.png" alt="Farmwork Doctor" width="500" />
-
-Check your Farmwork setup and diagnose issues.
-
-```bash
-farmwork doctor
-```
-
-**Checks:**
-- Core files (CLAUDE.md, .claude/, settings)
-- Agents and commands configuration
-- Audit system (_AUDIT/, FARMHOUSE.md, _PLANS/)
-- Navigation (justfile, just command)
-- Issue tracking (beads)
-- Security (.gitignore settings)
+----
 
 ## The Farmwork Method
 
@@ -188,6 +116,81 @@ your-project/
 ├── .beads/             # Issue tracking
 └── justfile            # Navigation commands
 ```
+
+<img src="/logo.png" alt="Farmwork - Developer Methodology" width="300" />
+
+## Commands
+
+### `farmwork init`
+
+Start setting up the new digital farm:
+
+```bash
+farmwork init                    # Interactive setup wizard
+```
+
+**Options:**
+- `-f, --force` - Overwrite existing files
+
+**Storybook Support:**
+If you enable Storybook (for React/Vue projects), the wizard will also ask for:
+- Storybook URL (e.g., storybook.yoursite.com)
+- Netlify Auth Token (for deployment)
+- Netlify Site ID
+- Password protection preference (recommended)
+
+**Creates:**
+- `CLAUDE.md` - Main instructions and phrase commands
+- `.claude/` - Claude Code configuration directory
+  - `settings.json` - Project settings
+  - `agents/` - 9 specialized subagents
+  - `commands/` - 2 user-invocable skills
+- `_AUDIT/` - Living audit documents
+  - `FARMHOUSE.md` - Framework command center
+  - `SECURITY.md` - Security posture tracking
+  - `PERFORMANCE.md` - Performance metrics
+  - `CODE_QUALITY.md` - Code quality tracking
+  - `TESTS.md` - Test coverage tracking
+- `_PLANS/` - Implementation plans directory
+- `justfile` - Navigation and task commands
+
+### `farmwork status`
+
+<img src="/status.png" alt="Farmwork Status" width="500" />
+
+Display Farmwork status and metrics.
+
+```bash
+farmwork status
+```
+
+**Shows:**
+- Component counts (agents, commands, audits, plans)
+- Issue tracking status (if beads is configured)
+- FARMHOUSE score and open items
+- Configuration file status
+- Project metrics (tests, stories)
+
+<img src="/status2.png" alt="Farmwork Status Details" width="500" />
+
+### `farmwork doctor`
+
+<img src="/doctor.png" alt="Farmwork Doctor" width="500" />
+
+Check your Farmwork setup and diagnose issues.
+
+```bash
+farmwork doctor
+```
+
+**Checks:**
+- Core files (CLAUDE.md, .claude/, settings)
+- Agents and commands configuration
+- Audit system (_AUDIT/, FARMHOUSE.md, _PLANS/)
+- Navigation (justfile, just command)
+- Issue tracking (beads)
+- Security (.gitignore settings)
+
 
 ## Requirements
 
