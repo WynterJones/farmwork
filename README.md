@@ -33,6 +33,7 @@ npx farmwork init
 4. **Autonomously Issue Tracking** - Using beads (`bd`) for full visibility
 5. **Living Audits** - Documents that track ongoing concerns
 6. **Plan & Implement** - You describe the outcome, the rest is handled, tracked and audited
+7. **Idea Garden & Compost** - Pre-plan creative stage with natural aging (ideas older than 60 days auto-compost)
 
 ### Phrase Commands
 
@@ -50,6 +51,31 @@ npx farmwork init
 | `make a plan for...` | Create implementation plan in `_PLANS/` |
 | `let's implement...` | Execute plan with issue tracking |
 
+**Idea Phrases** (Pre-Plan Stage):
+| Phrase | Action |
+|--------|--------|
+| `I have an idea for...` | Add new idea to `_AUDIT/GARDEN.md` with planted date |
+| `let's plan this idea...` | Graduate idea from GARDEN → create plan |
+| `compost this...` | Move rejected idea to `_AUDIT/COMPOST.md` |
+| `water the garden` | Generate 10 new ideas based on GARDEN and COMPOST |
+
+**Idea Lifecycle:**
+- **Fresh** (0-44 days) - New ideas ready to develop
+- **Wilting** (45-60 days) - Ideas aging, marked ⚠️ during audits
+- **Composted** (60+ days) - Auto-moved to COMPOST during "open the farm"
+
+**Research Phrases** (Pre-Plan Stage):
+| Phrase | Action |
+|--------|--------|
+| `let's research...` | Create or update research document in `_RESEARCH/` |
+| `update research on...` | Refresh existing research with new findings |
+| `show research on...` | Display research summary and staleness status |
+
+**Research Lifecycle:**
+- **Fresh** (0-14 days) - Research is current and reliable
+- **Aging** (15-30 days) - Consider refreshing for major decisions
+- **Stale** (30+ days) - Recommend updating before using for plans
+
 ### Slash Commands
 
 | Command | Description |
@@ -58,7 +84,7 @@ npx farmwork init
 
 ### Agents
 
-10 specialized agents included:
+12 specialized agents included:
 
 | Agent | Purpose |
 |-------|---------|
@@ -72,14 +98,18 @@ npx farmwork init
 | `code-cleaner` | Remove comments and console.logs |
 | `i18n-locale-translator` | Translate UI text to locales |
 | `storybook-maintainer` | Create/update Storybook stories |
+| `idea-gardener` | Manage Idea Garden and Compost |
+| `researcher` | Systematic research before planning |
 
 ### Recommended Workflow
 
 1. **Start Session**: Run `open the farm` to audit current state
-2. **Plan Work**: Use `make a plan for...` for new features
-3. **Implement**: Use `let's implement...` to execute with tracking
-4. **Quality Check**: Run `count the herd` for full audit + dry run
-5. **Ship**: Run `close the farm` or `/push` to push changes
+2. **Capture Ideas**: Use `I have an idea for...` to plant ideas in GARDEN
+3. **Research**: Use `let's research...` to gather information before planning
+4. **Plan Work**: Use `make a plan for...` for new features
+5. **Implement**: Use `let's implement...` to execute with tracking
+6. **Quality Check**: Run `count the herd` for full audit + dry run
+7. **Ship**: Run `close the farm` or `/push` to push changes
 
 You can `go to market` when you have a production-ready app with international users.
 
@@ -89,7 +119,7 @@ You can `go to market` when you have a production-ready app with international u
 your-project/
 ├── CLAUDE.md           # Main instructions & phrase commands
 ├── .claude/            # Claude Code configuration
-│   ├── agents/         # 10 specialized subagents
+│   ├── agents/         # 12 specialized subagents
 │   │   ├── the-farmer.md
 │   │   ├── code-reviewer.md
 │   │   ├── security-auditor.md
@@ -99,7 +129,9 @@ your-project/
 │   │   ├── unused-code-cleaner.md
 │   │   ├── code-cleaner.md
 │   │   ├── i18n-locale-translator.md
-│   │   └── storybook-maintainer.md
+│   │   ├── storybook-maintainer.md
+│   │   ├── idea-gardener.md
+│   │   └── researcher.md
 │   └── commands/       # User-invocable skills
 │       └── push.md
 ├── _AUDIT/             # Living audit documents
@@ -108,9 +140,13 @@ your-project/
 │   ├── PERFORMANCE.md  # Performance metrics
 │   ├── ACCESSIBILITY.md # WCAG 2.1 compliance
 │   ├── CODE_QUALITY.md # Code quality tracking
-│   └── TESTS.md        # Test coverage
+│   ├── TESTS.md        # Test coverage
+│   ├── GARDEN.md       # Idea nursery (pre-plan stage)
+│   └── COMPOST.md      # Rejected ideas archive
 ├── _PLANS/             # Implementation plans
 │   └── FEATURE_NAME.md
+├── _RESEARCH/          # Research documents (living docs)
+│   └── TOPIC_NAME.md
 ├── .beads/             # Issue tracking
 └── justfile            # Navigation commands
 ```
@@ -140,7 +176,7 @@ If you enable Storybook (for React/Vue projects), the wizard will also ask for:
 **Creates:**
 - `CLAUDE.md` - Main instructions and phrase commands
 - `.claude/` - Claude Code configuration directory
-  - `agents/` - 10 specialized subagents
+  - `agents/` - 12 specialized subagents
   - `commands/` - 1 user-invocable skill (/push)
 - `_AUDIT/` - Living audit documents
   - `FARMHOUSE.md` - Framework command center
@@ -149,7 +185,10 @@ If you enable Storybook (for React/Vue projects), the wizard will also ask for:
   - `ACCESSIBILITY.md` - WCAG 2.1 compliance
   - `CODE_QUALITY.md` - Code quality tracking
   - `TESTS.md` - Test coverage tracking
+  - `GARDEN.md` - Idea nursery (pre-plan stage)
+  - `COMPOST.md` - Rejected ideas archive
 - `_PLANS/` - Implementation plans directory
+- `_RESEARCH/` - Research documents directory
 - `justfile` - Navigation and task commands
 
 ### `farmwork status`
@@ -185,6 +224,7 @@ farmwork doctor
 - Core files (CLAUDE.md, .claude/, settings)
 - Agents and commands configuration
 - Audit system (_AUDIT/, FARMHOUSE.md, _PLANS/)
+- Research system (_RESEARCH/)
 - Navigation (justfile, just command)
 - Issue tracking (beads)
 - Security (.gitignore settings)

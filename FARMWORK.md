@@ -3,7 +3,7 @@
 > A reusable agentic development harness for AI-assisted software projects.
 > Turn any project into a well-organized, self-documenting, continuously improving codebase.
 
-**Version:** 1.0.0
+**Version:** 1.3.0
 **Author:** Wynter Jones
 **Website:** https://farmwork.wynter.ai
 
@@ -42,8 +42,13 @@ your-project/
 │   ├── PERFORMANCE.md      # Performance metrics
 │   ├── ACCESSIBILITY.md    # WCAG 2.1 compliance
 │   ├── CODE_QUALITY.md     # Code quality tracking
-│   └── TESTS.md            # Test coverage
+│   ├── TESTS.md            # Test coverage
+│   ├── GARDEN.md           # Idea nursery (pre-plan stage)
+│   └── COMPOST.md          # Rejected ideas archive
 ├── _PLANS/                 # Implementation plans (temporary)
+├── _RESEARCH/              # Research documents (living docs)
+│   ├── FEATURE_NAME.md     # Research on a feature
+│   └── TECHNOLOGY.md       # Research on a technology
 ├── .beads/                 # Issue tracking (auto-created by bd)
 ├── .claude/                # Claude Code configuration
 │   ├── commands/           # User-invocable skills (/command)
@@ -77,6 +82,33 @@ Farmwork defines three categories of phrase commands:
 |--------|--------|
 | `make a plan for...` | Create plan in `_PLANS/` |
 | `let's implement...` | Load plan, create Epic + issues, start work |
+
+#### Idea Phrases (Pre-Plan Stage)
+| Phrase | Action |
+|--------|--------|
+| `I have an idea for...` | Add new idea to `_AUDIT/GARDEN.md` with planted date |
+| `let's plan this idea...` | Graduate idea from GARDEN → create plan in `_PLANS/` |
+| `I dont want to do this idea...` | Reject idea → move from GARDEN to COMPOST |
+| `remove this feature...` | Archive feature idea to COMPOST |
+| `compost this...` | Move idea from GARDEN to COMPOST |
+| `water the garden` | Generate 10 new ideas based on existing GARDEN and COMPOST |
+
+**Idea Lifecycle:**
+- **Fresh** (0-44 days) - New ideas, ready to be developed
+- **Wilting** (45-60 days) - Ideas aging without action, marked with ⚠️
+- **Composted** (60+ days) - Auto-moved to COMPOST during "open the farm"
+
+#### Research Phrases (Pre-Plan Stage)
+| Phrase | Action |
+|--------|--------|
+| `let's research...` | Create or update research document in `_RESEARCH/` |
+| `update research on...` | Refresh existing research with new findings |
+| `show research on...` | Display research summary and suggest refresh if stale |
+
+**Research Lifecycle:**
+- **Fresh** (0-14 days) - Research is current and reliable
+- **Aging** (15-30 days) - Consider refreshing for major decisions
+- **Stale** (30+ days) - Recommend updating before using for plans
 
 #### Project Phrases (Customizable)
 Add project-specific phrases as needed.
@@ -264,7 +296,7 @@ search pattern:
 name: the-farmer
 description: Audit and update FARMHOUSE.md with current project metrics
 tools: Read, Grep, Glob, Edit, Bash
-model: haiku
+model: opus
 ---
 
 # The Farmer Agent
@@ -288,7 +320,7 @@ Maintains `_AUDIT/FARMHOUSE.md` - the living document tracking all systems and h
 name: code-reviewer
 description: Review code for quality, security, and maintainability
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 ---
 
 # Code Reviewer Agent
@@ -300,6 +332,59 @@ Reviews staged/modified files for:
 - Best practice violations
 
 Reports findings with severity and remediation steps.
+```
+
+#### `.claude/agents/idea-gardener.md`
+
+```markdown
+---
+name: idea-gardener
+description: Manage the Idea Garden and Compost - add, graduate, reject, or generate ideas
+tools: Read, Edit, Glob, Grep
+model: opus
+---
+
+# Idea Gardener Agent
+
+Manages `_AUDIT/GARDEN.md` and `_AUDIT/COMPOST.md` for idea lifecycle tracking.
+
+## Commands
+
+### Plant an Idea (from "I have an idea for...")
+1. Parse the idea title from user input
+2. Ask user for short description and key bullet points
+3. Add to GARDEN.md with format:
+   ```
+   ### [Idea Title]
+   **Planted:** YYYY-MM-DD
+   [Short description]
+   - Bullet point 1
+   ```
+4. Update counts
+
+### Graduate an Idea (from "let's plan this idea...")
+1. Find idea in GARDEN.md
+2. Create plan file in _PLANS/ using plan mode
+3. Move idea to "Graduated to Plans" table with date and plan link
+4. Remove from ## Ideas section
+
+### Compost an Idea (from "compost this..." / "I dont want...")
+1. Find idea in GARDEN.md (or accept new rejection)
+2. Ask for rejection reason
+3. Add to COMPOST.md with format:
+   ```
+   ### [Idea Title]
+   **Composted:** YYYY-MM-DD
+   **Reason:** [User's reason]
+   ```
+4. Remove from GARDEN.md if it was there
+
+### Water the Garden (from "water the garden")
+1. Read GARDEN.md and COMPOST.md to understand context
+2. Generate 10 creative ideas that extend existing themes and avoid rejected patterns
+3. Present as numbered list with title and one-line description
+4. Ask user which to plant (e.g., "1, 3, 5")
+5. Add selected ideas to GARDEN.md with planted date
 ```
 
 ### Step 6: Create Core Commands
@@ -464,6 +549,65 @@ _None currently_
 |------|---------|
 ```
 
+#### `_AUDIT/GARDEN.md`
+```markdown
+# Idea Garden
+
+> Nursery for new ideas and concepts. The pre-plan creative thinking stage.
+> Ideas older than 60 days without action will naturally compost during "open the farm".
+
+**Last Updated:** YYYY-MM-DD
+**Active Ideas:** 0
+**Wilting Ideas:** 0
+
+---
+
+## Idea Lifecycle
+
+Ideas have a natural lifecycle:
+- **Fresh** (0-44 days) - New ideas, ready to be developed
+- **Wilting** (45-60 days) - Ideas aging without action, marked with ⚠️
+- **Composted** (60+ days) - Auto-moved to COMPOST during "open the farm"
+
+---
+
+## Ideas
+
+### Example Idea
+**Planted:** 2024-12-01
+Short description of the idea.
+- Key point 1
+- Key point 2
+
+---
+
+## Graduated to Plans
+
+| Idea | Plan | Date |
+|------|------|------|
+```
+
+#### `_AUDIT/COMPOST.md`
+```markdown
+# Idea Compost
+
+> Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
+> Ideas that age 60+ days in the Garden are automatically composted during "open the farm".
+
+**Last Updated:** YYYY-MM-DD
+**Composted Ideas:** 0
+**Auto-Composted:** 0
+
+---
+
+## Composted Ideas
+
+### Example Composted Idea
+**Composted:** 2024-12-20
+**Reason:** Auto-composted: aged 60+ days without action
+Original description of the idea.
+```
+
 ---
 
 ## CLI Tool Specification
@@ -532,7 +676,7 @@ Say "till the land" to Claude to audit your setup.
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "projectName": "my-project",
   "commands": {
     "test": "npm run test",
@@ -548,7 +692,9 @@ Say "till the land" to Claude to audit your setup.
     "SECURITY",
     "PERFORMANCE",
     "CODE_QUALITY",
-    "TESTS"
+    "TESTS",
+    "GARDEN",
+    "COMPOST"
   ],
   "storybook": {
     "url": "storybook.yoursite.com",
@@ -623,7 +769,7 @@ Create `.claude/agents/your-agent.md`:
 name: your-agent
 description: What this agent does
 tools: Read, Grep, Glob, Edit, Bash
-model: haiku|sonnet|opus
+model: opus|sonnet|opus
 ---
 
 # Your Agent Name
@@ -710,6 +856,35 @@ bd sync
 ---
 
 ## Changelog
+
+### 1.3.0 (2024-12-27)
+- Added **Research Phase** - systematic research before planning with `_RESEARCH/` folder
+- Added **"let's research..."** phrase - creates research documents with docs, security, tech stack, gotchas
+- Added **"update research on..."** phrase - refreshes existing research with new findings
+- Added **"show research on..."** phrase - displays research summary and staleness status
+- Added **`researcher` agent** - spawns parallel subagents for comprehensive research
+- Added optional **ref.tools MCP integration** for enhanced documentation lookup
+- Research documents track freshness: Fresh (0-14 days) → Aging (15-30 days) → Stale (30+ days)
+- Updated `the-farmer` agent to check research staleness during audits
+- Updated `farmwork status` and `farmwork doctor` to include research documents
+- Agents count increased from 11 to 12
+
+### 1.2.0 (2024-12-23)
+- Added **"water the garden"** phrase - generates 10 new ideas based on existing GARDEN and COMPOST
+- Ideas now have a **Planted:** date when added to the Garden
+- Added idea aging lifecycle: Fresh (0-44 days) → Wilting (45-60 days) → Composted (60+ days)
+- "open the farm" now automatically composts ideas older than 60 days
+- Wilting ideas (45-60 days) are marked with ⚠️ and reported during audits
+- Updated GARDEN.md and COMPOST.md templates with lifecycle documentation
+- Updated `the-farmer` agent to tend the Idea Garden during audits
+- Updated `idea-gardener` agent to add planted dates and generate ideas
+
+### 1.1.0 (2024-12-22)
+- Added `_AUDIT/GARDEN.md` for idea nursery (pre-plan creative thinking stage)
+- Added `_AUDIT/COMPOST.md` for rejected ideas archive
+- Added `idea-gardener` agent to manage idea lifecycle
+- Added Idea Phrases: "I have an idea for...", "let's plan this idea...", "compost this...", etc.
+- Ideas can now graduate to plans or be composted for reference
 
 ### 1.0.0 (2024-12-20)
 - Initial Farmwork framework release

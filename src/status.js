@@ -99,12 +99,16 @@ export async function status() {
   const commandsDir = path.join(claudeDir, "commands");
   const auditDir = path.join(cwd, "_AUDIT");
   const plansDir = path.join(cwd, "_PLANS");
+  const researchDir = path.join(cwd, "_RESEARCH");
+  const officeDir = path.join(cwd, "_OFFICE");
   const beadsDir = path.join(cwd, ".beads");
 
   const agents = countMarkdownFiles(agentsDir);
   const commands = countMarkdownFiles(commandsDir);
   const audits = countMarkdownFiles(auditDir);
   const plans = countMarkdownFiles(plansDir);
+  const research = countMarkdownFiles(researchDir);
+  const office = countMarkdownFiles(officeDir);
   const recipes = countJustfileRecipes(cwd);
 
   // Component Counts Section
@@ -113,6 +117,8 @@ export async function status() {
   farmTerm.metric("Commands", commands, emojis.bee);
   farmTerm.metric("Justfile Recipes", recipes, emojis.sheep);
   farmTerm.metric("Audit Docs", audits, emojis.wheat);
+  farmTerm.metric("Research Docs", research, emojis.owl);
+  farmTerm.metric("Office Docs", office, emojis.barn);
   farmTerm.metric("Plans", plans, emojis.sunflower);
 
   // Issue Tracking Section
@@ -167,6 +173,8 @@ export async function status() {
     { label: "justfile", exists: fs.existsSync(justfile) },
     { label: ".claude/agents/", exists: fs.existsSync(agentsDir) && agents > 0 },
     { label: ".claude/commands/", exists: fs.existsSync(commandsDir) && commands > 0 },
+    { label: "_OFFICE/", exists: fs.existsSync(officeDir) && office > 0 },
+    { label: "_RESEARCH/", exists: fs.existsSync(researchDir), optional: true },
     { label: ".beads/", exists: fs.existsSync(beadsDir), optional: true },
   ];
 

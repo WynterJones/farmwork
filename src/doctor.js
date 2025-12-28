@@ -163,23 +163,44 @@ export async function doctor() {
     checkExists(path.join(cwd, "_PLANS"), "_PLANS/ directory exists"),
   );
 
+  // Research System
+  checks.push({ category: "Research System", emoji: "🔬", items: [] });
+  checks[3].items.push(
+    checkExists(path.join(cwd, "_RESEARCH"), "_RESEARCH/ directory exists"),
+  );
+
+  // Office System
+  checks.push({ category: "Office System", emoji: "🏢", items: [] });
+  checks[4].items.push(
+    checkExists(path.join(cwd, "_OFFICE"), "_OFFICE/ directory exists"),
+  );
+  checks[4].items.push(
+    checkExists(path.join(cwd, "_OFFICE", "CORE_LOOP.md"), "CORE_LOOP.md exists"),
+  );
+  checks[4].items.push(
+    checkExists(path.join(cwd, "_OFFICE", "ONBOARDING.md"), "ONBOARDING.md exists"),
+  );
+  checks[4].items.push(
+    checkExists(path.join(cwd, "_OFFICE", "USER_GUIDE.md"), "USER_GUIDE.md exists"),
+  );
+
   // Navigation
   checks.push({ category: "Navigation", emoji: "🐓", items: [] });
-  checks[3].items.push(
+  checks[5].items.push(
     checkExists(path.join(cwd, "justfile"), "justfile exists"),
   );
-  checks[3].items.push(checkCommand("just", "just command available"));
+  checks[5].items.push(checkCommand("just", "just command available"));
 
   // Issue Tracking
   checks.push({ category: "Issue Tracking", emoji: "🐷", items: [] });
-  checks[4].items.push(
+  checks[6].items.push(
     checkExists(path.join(cwd, ".beads"), ".beads/ directory exists"),
   );
-  checks[4].items.push(checkCommand("bd", "bd (beads) command available"));
+  checks[6].items.push(checkCommand("bd", "bd (beads) command available"));
 
   // Security
   checks.push({ category: "Security", emoji: "🐕", items: [] });
-  checks[5].items.push(checkGitignore(cwd));
+  checks[7].items.push(checkGitignore(cwd));
 
   let totalPassed = 0;
   let totalFailed = 0;
