@@ -1,4 +1,4 @@
-<img src="/init.png" alt="Farmwork - Developer Methodology" width="500" />
+<img src="/images/init.png" alt="Farmwork - Developer Methodology" width="500" />
 
 > A workflow framework for Claude Code by Wynter Jones
 
@@ -76,15 +76,21 @@ npx farmwork init
 - **Aging** (15-30 days) - Consider refreshing for major decisions
 - **Stale** (30+ days) - Recommend updating before using for plans
 
+**Office Phrases** (Product Strategy & UX):
+| Phrase | Action |
+|--------|--------|
+| `go to production` | UX production check: update `_OFFICE/` docs with audit trail |
+
 ### Slash Commands
 
 | Command | Description |
 |---------|-------------|
 | `/push` | Clean, stage, lint, test, build, commit, push, update metrics (11 steps) |
+| `/office` | Interactive strategy and UX command - updates CORE_LOOP, ONBOARDING, USER_GUIDE |
 
 ### Agents
 
-12 specialized agents included:
+15 specialized agents included:
 
 | Agent | Purpose |
 |-------|---------|
@@ -100,6 +106,9 @@ npx farmwork init
 | `storybook-maintainer` | Create/update Storybook stories |
 | `idea-gardener` | Manage Idea Garden and Compost |
 | `researcher` | Systematic research before planning |
+| `strategy-agent` | Core loop strategy (what/stopping/why) |
+| `onboarding-agent` | Tours, tooltips, modals, empty states |
+| `user-guide-agent` | Feature documentation for help docs |
 
 ### Recommended Workflow
 
@@ -119,7 +128,7 @@ You can `go to market` when you have a production-ready app with international u
 your-project/
 ├── CLAUDE.md           # Main instructions & phrase commands
 ├── .claude/            # Claude Code configuration
-│   ├── agents/         # 12 specialized subagents
+│   ├── agents/         # 15 specialized subagents
 │   │   ├── the-farmer.md
 │   │   ├── code-reviewer.md
 │   │   ├── security-auditor.md
@@ -131,9 +140,13 @@ your-project/
 │   │   ├── i18n-locale-translator.md
 │   │   ├── storybook-maintainer.md
 │   │   ├── idea-gardener.md
-│   │   └── researcher.md
+│   │   ├── researcher.md
+│   │   ├── strategy-agent.md      # Core loop strategy
+│   │   ├── onboarding-agent.md    # UX onboarding
+│   │   └── user-guide-agent.md    # Feature documentation
 │   └── commands/       # User-invocable skills
-│       └── push.md
+│       ├── push.md
+│       └── office.md   # Interactive strategy command
 ├── _AUDIT/             # Living audit documents
 │   ├── FARMHOUSE.md    # Framework command center
 │   ├── SECURITY.md     # Security posture
@@ -143,6 +156,10 @@ your-project/
 │   ├── TESTS.md        # Test coverage
 │   ├── GARDEN.md       # Idea nursery (pre-plan stage)
 │   └── COMPOST.md      # Rejected ideas archive
+├── _OFFICE/            # Product strategy & UX docs
+│   ├── CORE_LOOP.md    # What/Stopping/Why strategy
+│   ├── ONBOARDING.md   # Tours, tooltips, modals
+│   └── USER_GUIDE.md   # Feature documentation
 ├── _PLANS/             # Implementation plans
 │   └── FEATURE_NAME.md
 ├── _RESEARCH/          # Research documents (living docs)
@@ -151,7 +168,7 @@ your-project/
 └── justfile            # Navigation commands
 ```
 
-<img src="/logo.png" alt="Farmwork - Developer Methodology" width="300" />
+<img src="/images/logo.png" alt="Farmwork - Developer Methodology" width="300" />
 
 ## Commands
 
@@ -176,8 +193,8 @@ If you enable Storybook (for React/Vue projects), the wizard will also ask for:
 **Creates:**
 - `CLAUDE.md` - Main instructions and phrase commands
 - `.claude/` - Claude Code configuration directory
-  - `agents/` - 12 specialized subagents
-  - `commands/` - 1 user-invocable skill (/push)
+  - `agents/` - 15 specialized subagents
+  - `commands/` - 2 user-invocable skills (/push, /office)
 - `_AUDIT/` - Living audit documents
   - `FARMHOUSE.md` - Framework command center
   - `SECURITY.md` - Security posture tracking
@@ -187,13 +204,17 @@ If you enable Storybook (for React/Vue projects), the wizard will also ask for:
   - `TESTS.md` - Test coverage tracking
   - `GARDEN.md` - Idea nursery (pre-plan stage)
   - `COMPOST.md` - Rejected ideas archive
+- `_OFFICE/` - Product strategy & UX documents
+  - `CORE_LOOP.md` - What/Stopping/Why strategy
+  - `ONBOARDING.md` - Tours, tooltips, modals
+  - `USER_GUIDE.md` - Feature documentation
 - `_PLANS/` - Implementation plans directory
 - `_RESEARCH/` - Research documents directory
 - `justfile` - Navigation and task commands
 
 ### `farmwork status`
 
-<img src="/status.png" alt="Farmwork Status" width="500" />
+<img src="/images/status.png" alt="Farmwork Status" width="500" />
 
 Display Farmwork status and metrics.
 
@@ -203,16 +224,17 @@ farmwork status
 
 **Shows:**
 - Component counts (agents, commands, audits, plans)
+- Office documents status
 - Issue tracking status (if beads is configured)
 - FARMHOUSE score and open items
 - Configuration file status
 - Project metrics (tests, stories)
 
-<img src="/status2.png" alt="Farmwork Status Details" width="500" />
+<img src="/images/status2.png" alt="Farmwork Status Details" width="500" />
 
 ### `farmwork doctor`
 
-<img src="/doctor.png" alt="Farmwork Doctor" width="500" />
+<img src="/images/doctor.png" alt="Farmwork Doctor" width="500" />
 
 Check your Farmwork setup and diagnose issues.
 
@@ -225,6 +247,7 @@ farmwork doctor
 - Agents and commands configuration
 - Audit system (_AUDIT/, FARMHOUSE.md, _PLANS/)
 - Research system (_RESEARCH/)
+- Office system (_OFFICE/, CORE_LOOP.md, ONBOARDING.md, USER_GUIDE.md)
 - Navigation (justfile, just command)
 - Issue tracking (beads)
 - Security (.gitignore settings)
