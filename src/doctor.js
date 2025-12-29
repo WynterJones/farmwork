@@ -175,7 +175,10 @@ export async function doctor() {
     checkExists(path.join(cwd, "_OFFICE"), "_OFFICE/ directory exists"),
   );
   checks[4].items.push(
-    checkExists(path.join(cwd, "_OFFICE", "CORE_LOOP.md"), "CORE_LOOP.md exists"),
+    checkExists(path.join(cwd, "_OFFICE", "GREENFIELD.md"), "GREENFIELD.md exists"),
+  );
+  checks[4].items.push(
+    checkExists(path.join(cwd, "_OFFICE", "BROWNFIELD.md"), "BROWNFIELD.md exists"),
   );
   checks[4].items.push(
     checkExists(path.join(cwd, "_OFFICE", "ONBOARDING.md"), "ONBOARDING.md exists"),

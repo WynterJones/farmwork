@@ -13,15 +13,9 @@ function detectPackageJson() {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
     return {
       scripts: pkg.scripts || {},
-      hasStorybook: !!(
-        pkg.devDependencies?.storybook ||
-        pkg.dependencies?.storybook ||
-        pkg.devDependencies?.["@storybook/react"] ||
-        pkg.scripts?.storybook
-      ),
     };
   } catch {
-    return { scripts: {}, hasStorybook: false };
+    return { scripts: {} };
   }
 }
 
@@ -74,44 +68,9 @@ const QUESTIONS = [
   },
   {
     type: "confirm",
-    name: "includeStorybook",
-    message: "🐄 Include Storybook support?",
-    default: () => detectPackageJson().hasStorybook,
-  },
-  {
-    type: "confirm",
     name: "includeI18n",
     message: "🌻 Include i18n support?",
     default: false,
-  },
-];
-
-const STORYBOOK_QUESTIONS = [
-  {
-    type: "input",
-    name: "storybookUrl",
-    message: "🌿 Storybook URL:",
-    default: "storybook.example.com",
-  },
-  {
-    type: "input",
-    name: "netlifyAuthToken",
-    message: "🗝️ Netlify Auth Token:",
-    validate: (input) =>
-      input.length > 0 || "Auth token is required for deployment",
-  },
-  {
-    type: "input",
-    name: "netlifySiteId",
-    message: "🏷️ Netlify Site ID:",
-    validate: (input) =>
-      input.length > 0 || "Site ID is required for deployment",
-  },
-  {
-    type: "confirm",
-    name: "passwordProtect",
-    message: "🐕 Password protect Storybook?",
-    default: true,
   },
 ];
 
@@ -125,10 +84,11 @@ export async function init(options) {
   const claudeDir = path.join(cwd, ".claude");
   const farmworkConfig = path.join(cwd, ".farmwork.json");
   const claudeMd = path.join(cwd, "CLAUDE.md");
+  const agentsMd = path.join(cwd, "AGENTS.md");
 
   const isAlreadyInstalled =
     fs.existsSync(claudeDir) &&
-    (fs.existsSync(farmworkConfig) || fs.existsSync(claudeMd));
+    (fs.existsSync(farmworkConfig) || fs.existsSync(claudeMd) || fs.existsSync(agentsMd));
 
   if (isAlreadyInstalled && !options.force) {
     farmTerm.warn("Farmwork is already installed in this project!");
@@ -138,6 +98,7 @@ export async function init(options) {
     farmTerm.gray("  Detected:\n");
     if (fs.existsSync(claudeDir)) farmTerm.gray("    • .claude/ directory\n");
     if (fs.existsSync(claudeMd)) farmTerm.gray("    • CLAUDE.md\n");
+    if (fs.existsSync(agentsMd)) farmTerm.gray("    • AGENTS.md\n");
     if (fs.existsSync(farmworkConfig)) farmTerm.gray("    • .farmwork.json\n");
     farmTerm.nl();
 
@@ -189,27 +150,6 @@ export async function init(options) {
 
   const answers = await inquirer.prompt(QUESTIONS);
 
-  // Storybook configuration
-  if (answers.includeStorybook) {
-    farmTerm.nl();
-    farmTerm.section("Storybook Deployment", "🐄");
-    farmTerm.gray(
-      "  We recommend deploying Storybook to Netlify with password protection.\n",
-    );
-    farmTerm.gray(
-      "  This keeps your component docs private but accessible to your team.\n\n",
-    );
-
-    const storybookAnswers = await inquirer.prompt(STORYBOOK_QUESTIONS);
-    Object.assign(answers, storybookAnswers);
-
-    if (answers.passwordProtect) {
-      farmTerm.nl();
-      farmTerm.warn("Remember to enable password protection in Netlify:");
-      farmTerm.gray("  Site settings → Access control → Password protection\n");
-    }
-  }
-
   // Check for existing files
   const existingFiles = [];
   const filesToCheck = [
@@ -217,6 +157,11 @@ export async function init(options) {
       path: path.join(cwd, "CLAUDE.md"),
       name: "CLAUDE.md",
       backup: "OLD_CLAUDE.md",
+    },
+    {
+      path: path.join(cwd, "AGENTS.md"),
+      name: "AGENTS.md",
+      backup: "OLD_AGENTS.md",
     },
     {
       path: path.join(cwd, "justfile"),
@@ -331,6 +276,7 @@ export async function init(options) {
         },
       },
       { name: "Planting CLAUDE.md", fn: () => createClaudeMd(cwd, answers) },
+      { name: "Growing AGENTS.md", fn: () => createAgentsMd(cwd, answers) },
       {
         name: "Building FARMHOUSE.md",
         fn: () => createFarmhouseMd(cwd, answers),
@@ -416,8 +362,8 @@ export async function init(options) {
         // bd init might fail if already initialized
       }
 
-      // Clean up beads-generated files
-      const beadsAgentFiles = ["AGENTS.md", "@AGENTS.md"];
+      // Clean up beads-generated files (only @AGENTS.md, we create our own AGENTS.md)
+      const beadsAgentFiles = ["@AGENTS.md"];
       for (const file of beadsAgentFiles) {
         try {
           await fs.remove(path.join(cwd, file));
@@ -443,6 +389,7 @@ export async function init(options) {
         ".claude/commands/",
         ".claude/agents/",
         "CLAUDE.md",
+        "AGENTS.md",
         "justfile",
         ".farmwork.json",
       ],
@@ -591,7 +538,8 @@ Run these in order for a complete development cycle:
 
 | Phrase | Action |
 |--------|--------|
-| **go to production** | UX production check: update ONBOARDING.md, USER_GUIDE.md, audit CORE_LOOP.md changes |
+| **setup office** | Interactive guided setup: GREENFIELD vision, strategy, optional ONBOARDING and USER_GUIDE |
+| **go to production** | Production check: update BROWNFIELD.md, check GREENFIELD alignment, note doc impacts |
 
 ---
 
@@ -605,10 +553,10 @@ Run these in order for a complete development cycle:
 **count the herd** (Full Audit Cycle)
 Runs all inspection agents in parallel, then dry run quality gates. No push.
 
-1. **Code Review & Cleanup** - \`code-reviewer\` + \`unused-code-cleaner\`
-2. **Performance Audit** - \`performance-auditor\`, updates \`_AUDIT/PERFORMANCE.md\`
-3. **Security Audit** - \`security-auditor\` for OWASP Top 10, updates \`_AUDIT/SECURITY.md\`
-4. **Code Quality** - \`code-smell-auditor\` for DRY violations, updates \`_AUDIT/CODE_QUALITY.md\`
+1. **Code Quality** - \`code-quality\` for review + smells, updates \`_AUDIT/CODE_QUALITY.md\`
+2. **Code Cleanup** - \`code-cleaner\` for dead code + comments
+3. **Performance Audit** - \`performance-auditor\`, updates \`_AUDIT/PERFORMANCE.md\`
+4. **Security Audit** - \`security-auditor\` for OWASP Top 10, updates \`_AUDIT/SECURITY.md\`
 5. **Accessibility** - \`accessibility-auditor\` for WCAG 2.1, updates \`_AUDIT/ACCESSIBILITY.md\`
 6. **Dry Run** - lint, tests, build (but NOT commit/push)
 7. **Summary Report** - Consolidate findings, ask user next steps
@@ -691,55 +639,117 @@ Runs all inspection agents in parallel, then dry run quality gates. No push.
 
 ### Office Phrase Details
 
+**setup office**
+
+Interactive guided setup experience for the _OFFICE/ documents.
+
+1. **Welcome & Context**
+   - Display: "Let's set up your product office. I'll guide you through defining your vision and documentation."
+   - Check if _OFFICE/ files already exist
+   - If existing files found, ask: "Office files already exist. Would you like to update them or start fresh?"
+
+2. **GREENFIELD.md Setup (Required)**
+   - Spawn \`strategy-agent\` for interactive setup
+   - Ask questions in sequence:
+     a. "What's your project name?" (pre-fill from .farmwork.json if available)
+     b. "In one sentence, what is this product?"
+     c. "What problem does it solve for users?"
+     d. "What's the main thing users DO in your app?" (Core action)
+     e. "What's stopping users from succeeding?" (Blockers)
+     f. "What motivates users to keep using it?" (Motivation)
+   - Save answers to GREENFIELD.md
+   - Report: "Vision documented in GREENFIELD.md"
+
+3. **Strategy Refinement (Optional)**
+   - Ask: "Would you like to define strategic pillars? (y/n)"
+   - If yes, ask for 2-3 key principles that guide decisions
+   - Add to GREENFIELD.md Strategic Pillars section
+
+4. **ONBOARDING.md Setup (Optional)**
+   - Ask: "Does your app have onboarding elements to document? (y/n)"
+   - If yes, spawn \`onboarding-agent\` to:
+     a. Scan codebase for existing onboarding elements
+     b. Ask about welcome experience
+     c. Ask about guided tours or tooltips
+     d. Document findings in ONBOARDING.md
+   - If no, keep placeholder ONBOARDING.md
+
+5. **USER_GUIDE.md Setup (Optional)**
+   - Ask: "Would you like to set up user documentation now? (y/n)"
+   - If yes, spawn \`user-guide-agent\` to:
+     a. Scan codebase for features
+     b. Ask about main features to document
+     c. Create Quick Start section
+     d. Document features in USER_GUIDE.md
+   - If no, keep placeholder USER_GUIDE.md
+
+6. **Summary Report**
+   \`\`\`
+   ## Office Setup Complete
+
+   ### Documents Created/Updated
+   - GREENFIELD.md: [Complete/Updated]
+   - BROWNFIELD.md: [Created - will populate on "go to production"]
+   - ONBOARDING.md: [Complete/Skipped]
+   - USER_GUIDE.md: [Complete/Skipped]
+
+   ### Next Steps
+   - Use "go to production" to update BROWNFIELD.md with implemented features
+   - Run /push to commit your office documents
+   \`\`\`
+
+---
+
 **go to production**
 
 Production readiness check from a user experience perspective. Separate from "close the farm" (which handles code quality/push).
 
-1. **Update ONBOARDING.md**
-   - Spawn \`onboarding-agent\` to scan for onboarding elements
-   - Check for incomplete or missing onboarding flows
+1. **Update BROWNFIELD.md**
+   - Spawn \`brownfield-agent\` to scan for implemented features
+   - Document any new features added since last production
+   - Document any features removed
+   - Update Production History table
    - Update Last Updated date
-   - Add changelog entry if changes found
 
-2. **Update USER_GUIDE.md**
-   - Spawn \`user-guide-agent\` to scan for undocumented features
-   - Check for placeholder text or incomplete sections
-   - Update feature count
-   - Add changelog entry if changes found
+2. **Check for Document Impacts**
+   - Scan changes against USER_GUIDE.md
+   - List any features that need USER_GUIDE updates
+   - Scan changes against ONBOARDING.md
+   - List any onboarding elements that need updates
 
-3. **Audit CORE_LOOP.md**
-   - Spawn \`strategy-agent\` to check if CORE_LOOP.md has changed since last production check
-   - If changed, add audit trail entry to Strategy Changelog
-   - Report strategy evolution summary
+3. **Check GREENFIELD Alignment**
+   - Spawn \`strategy-agent\` to compare BROWNFIELD against GREENFIELD
+   - Ask user: "Do you see any misalignment between your vision (GREENFIELD) and what's implemented (BROWNFIELD)?"
+   - If misalignment reported, add to Strategy Changelog
 
 4. **Generate Production Readiness Report**
    \`\`\`
-   ## Production Readiness: User Experience
+   ## Production Readiness: Implementation Check
 
-   ### Strategy Status
+   ### BROWNFIELD Status
    - Last Updated: YYYY-MM-DD
-   - Changes Since Last Deploy: Yes/No
-   - Confidence: High/Medium/Low
+   - New Features: X added
+   - Removed Features: X removed
+   - Modified Features: X changed
 
-   ### Onboarding Status
-   - Elements: X documented
-   - Gaps: X identified
-   - Empty States: X complete
+   ### Documentation Impact
+   - USER_GUIDE.md needs updates: [list or "None"]
+   - ONBOARDING.md needs updates: [list or "None"]
 
-   ### Documentation Status
-   - Features Documented: X
-   - Quick Start: Complete/Incomplete
-   - FAQ: X entries
+   ### Strategy Alignment
+   - GREENFIELD vision: [summary]
+   - BROWNFIELD reality: [summary]
+   - Alignment: High/Medium/Low
 
    ### Recommendation
    [Ready for production / Needs attention: ...]
    \`\`\`
 
 5. **Ask for Confirmation**
-   - "UX production check complete. Ready to proceed with deployment?"
+   - "Production check complete. Ready to proceed with deployment?"
    - Wait for user confirmation before any further action
 
-**Note:** This phrase focuses on UX readiness. Use "close the farm" for code quality gates and pushing to remote.
+**Note:** This phrase focuses on implementation status and alignment. Use "close the farm" for code quality gates and pushing to remote.
 
 ---
 
@@ -790,6 +800,365 @@ ${answers.buildCommand}   # Verify compilation
   await fs.writeFile(path.join(cwd, "CLAUDE.md"), content);
 }
 
+async function createAgentsMd(cwd, answers) {
+  const content = `# ${answers.projectName}
+
+> This document provides guidance for AI coding assistants working on this project.
+> It defines workflows, phrase commands, and project conventions that help maintain
+> code quality and consistent development practices.
+
+---
+
+## MANDATORY: Issue-First Workflow
+
+**ALWAYS create beads issues BEFORE starting work.** This ensures full visibility and tracking.
+
+### Single Task
+1. Create issue: \`bd create "Task description" -t bug|feature|task -p 0-4\`
+2. Claim it: \`bd update <id> --status in_progress\`
+3. Do the work
+4. Close it: \`bd close <id> --reason "What was done"\`
+
+### Multiple Tasks
+When given multiple tasks, **log ALL of them first** before starting:
+1. Create all issues upfront
+2. Show what's queued: \`bd list --status open\`
+3. Work through them one by one
+4. Close each issue when complete
+
+**NO EXCEPTIONS**: Every task gets an issue.
+
+---
+
+## Phrase Commands
+
+These are phrase triggers. Most activate when the phrase is the **entire message**.
+
+---
+
+### Farmwork Phrases (Development Workflow)
+
+Run these in order for a complete development cycle:
+
+| Phrase | Action |
+|--------|--------|
+| **open the farm** | Audit systems, update \`_AUDIT/FARMHOUSE.md\` with current metrics |
+| **count the herd** | Full inspection + dry run: code review, cleanup, performance, security, code quality, accessibility |
+| **go to market** | i18n scan + accessibility audit for missing translations and a11y issues |
+| **close the farm** | Execute commit and push workflow (lint, test, build, commit, push) |
+
+---
+
+### Plan Phrases
+
+| Phrase | Action |
+|--------|--------|
+| **make a plan for...** | Investigate codebase, create plan, save to \`_PLANS/*.md\` |
+| **let's implement...** | Load plan from \`_PLANS/*.md\`, create Epic + issues, confirm, start work |
+
+---
+
+### Idea Phrases (Pre-Plan Stage)
+
+| Phrase | Action |
+|--------|--------|
+| **I have an idea for...** | Add new idea to \`_AUDIT/GARDEN.md\` (title, description, bullets) |
+| **let's plan this idea...** | Graduate idea from GARDEN → create plan in \`_PLANS/\` |
+| **I dont want to do this idea...** | Reject idea → move from GARDEN to COMPOST |
+| **remove this feature...** | Archive feature idea to COMPOST |
+| **compost this...** | Move idea from GARDEN to COMPOST |
+| **water the garden** | Generate 10 new ideas based on existing GARDEN and COMPOST |
+
+---
+
+### Research Phrases (Pre-Plan Stage)
+
+| Phrase | Action |
+|--------|--------|
+| **let's research...** | Create or update research document in \`_RESEARCH/\` |
+| **update research on...** | Update existing research document with fresh findings |
+| **show research on...** | Display summary of existing research document |
+
+---
+
+### Office Phrases (Product Strategy & UX)
+
+| Phrase | Action |
+|--------|--------|
+| **setup office** | Interactive guided setup: GREENFIELD vision, strategy, optional ONBOARDING and USER_GUIDE |
+| **go to production** | Production check: update BROWNFIELD.md, check GREENFIELD alignment, note doc impacts |
+
+---
+
+### Farmwork Phrase Details
+
+**open the farm**
+1. Launch \`the-farmer\` agent to audit all systems
+2. Run \`bd list --status closed | wc -l\` to get total completed issues
+3. Updates \`_AUDIT/FARMHOUSE.md\` with current metrics
+
+**count the herd** (Full Audit Cycle)
+Runs all inspection agents in parallel, then dry run quality gates. No push.
+
+1. **Code Quality** - \`code-quality\` for review + smells, updates \`_AUDIT/CODE_QUALITY.md\`
+2. **Code Cleanup** - \`code-cleaner\` for dead code + comments
+3. **Performance Audit** - \`performance-auditor\`, updates \`_AUDIT/PERFORMANCE.md\`
+4. **Security Audit** - \`security-auditor\` for OWASP Top 10, updates \`_AUDIT/SECURITY.md\`
+5. **Accessibility** - \`accessibility-auditor\` for WCAG 2.1, updates \`_AUDIT/ACCESSIBILITY.md\`
+6. **Dry Run** - lint, tests, build (but NOT commit/push)
+7. **Summary Report** - Consolidate findings, ask user next steps
+
+**go to market**
+1. Scan for hardcoded text not using i18n
+2. Launch \`i18n-locale-translator\` agent
+3. Launch \`accessibility-auditor\` for WCAG 2.1 compliance
+4. Updates \`_AUDIT/ACCESSIBILITY.md\`
+
+**close the farm**
+- Execute the commit and push workflow immediately
+
+---
+
+### Idea Phrase Details
+
+**I have an idea for...**
+1. Launch \`idea-gardener\` agent
+2. Parse idea title from user input
+3. Ask for short description and bullet points
+4. Add to \`_AUDIT/GARDEN.md\` under ## Ideas section
+
+**let's plan this idea...**
+1. Launch \`idea-gardener\` agent
+2. Find the idea in GARDEN.md
+3. Create plan in \`_PLANS/\` using planning mode
+4. Move to "Graduated to Plans" table
+5. Remove from ## Ideas section
+
+**compost this...** / **I dont want to do this idea...**
+1. Launch \`idea-gardener\` agent
+2. Find idea in GARDEN.md (or accept new rejection)
+3. Ask for rejection reason
+4. Add to \`_AUDIT/COMPOST.md\` with reason
+5. Remove from GARDEN.md if it was there
+
+**water the garden**
+1. Launch \`idea-gardener\` agent
+2. Read \`_AUDIT/GARDEN.md\` to understand existing ideas and themes
+3. Read \`_AUDIT/COMPOST.md\` to understand what didn't work and why
+4. Generate 10 new, creative ideas that:
+   - Build on or extend existing garden ideas
+   - Avoid patterns that led to composted ideas
+   - Consider the project's direction and goals
+5. Present ideas as a numbered list with title and one-line description
+6. Ask user: "Which ideas would you like to plant? (enter numbers, e.g., 1, 3, 5)"
+7. For selected ideas, add each to GARDEN.md with today's planted date
+
+---
+
+### Research Phrase Details
+
+**let's research...**
+1. Launch \`researcher\` agent
+2. Parse research topic from user input
+3. Check for existing research in \`_RESEARCH/\`
+4. Spawn parallel subagents for:
+   - Documentation finder (official docs, API refs)
+   - Security researcher (CVEs, known issues)
+   - Tech stack analyzer (dependencies, compatibility)
+   - Community researcher (gotchas, discussions)
+5. Consolidate findings into \`_RESEARCH/[TOPIC_NAME].md\`
+6. Display summary and suggest next steps
+
+**update research on...**
+1. Launch \`researcher\` agent
+2. Find existing research document in \`_RESEARCH/\`
+3. Run targeted research refresh on specified areas
+4. Merge new findings, mark outdated info with strikethrough
+5. Update research history and Last Researched date
+
+**show research on...**
+1. Find research document in \`_RESEARCH/\`
+2. Display summary of key findings, risks, confidence level
+3. Suggest refresh if research is aging (15+ days) or stale (30+ days)
+
+---
+
+### Office Phrase Details
+
+**setup office**
+
+Interactive guided setup experience for the _OFFICE/ documents.
+
+1. **Welcome & Context**
+   - Display: "Let's set up your product office. I'll guide you through defining your vision and documentation."
+   - Check if _OFFICE/ files already exist
+   - If existing files found, ask: "Office files already exist. Would you like to update them or start fresh?"
+
+2. **GREENFIELD.md Setup (Required)**
+   - Spawn \`strategy-agent\` for interactive setup
+   - Ask questions in sequence:
+     a. "What's your project name?" (pre-fill from .farmwork.json if available)
+     b. "In one sentence, what is this product?"
+     c. "What problem does it solve for users?"
+     d. "What's the main thing users DO in your app?" (Core action)
+     e. "What's stopping users from succeeding?" (Blockers)
+     f. "What motivates users to keep using it?" (Motivation)
+   - Save answers to GREENFIELD.md
+   - Report: "Vision documented in GREENFIELD.md"
+
+3. **Strategy Refinement (Optional)**
+   - Ask: "Would you like to define strategic pillars? (y/n)"
+   - If yes, ask for 2-3 key principles that guide decisions
+   - Add to GREENFIELD.md Strategic Pillars section
+
+4. **ONBOARDING.md Setup (Optional)**
+   - Ask: "Does your app have onboarding elements to document? (y/n)"
+   - If yes, spawn \`onboarding-agent\` to:
+     a. Scan codebase for existing onboarding elements
+     b. Ask about welcome experience
+     c. Ask about guided tours or tooltips
+     d. Document findings in ONBOARDING.md
+   - If no, keep placeholder ONBOARDING.md
+
+5. **USER_GUIDE.md Setup (Optional)**
+   - Ask: "Would you like to set up user documentation now? (y/n)"
+   - If yes, spawn \`user-guide-agent\` to:
+     a. Scan codebase for features
+     b. Ask about main features to document
+     c. Create Quick Start section
+     d. Document features in USER_GUIDE.md
+   - If no, keep placeholder USER_GUIDE.md
+
+6. **Summary Report**
+   \`\`\`
+   ## Office Setup Complete
+
+   ### Documents Created/Updated
+   - GREENFIELD.md: [Complete/Updated]
+   - BROWNFIELD.md: [Created - will populate on "go to production"]
+   - ONBOARDING.md: [Complete/Skipped]
+   - USER_GUIDE.md: [Complete/Skipped]
+
+   ### Next Steps
+   - Use "go to production" to update BROWNFIELD.md with implemented features
+   - Run /push to commit your office documents
+   \`\`\`
+
+---
+
+**go to production**
+
+Production readiness check from a user experience perspective. Separate from "close the farm" (which handles code quality/push).
+
+1. **Update BROWNFIELD.md**
+   - Spawn \`brownfield-agent\` to scan for implemented features
+   - Document any new features added since last production
+   - Document any features removed
+   - Update Production History table
+   - Update Last Updated date
+
+2. **Check for Document Impacts**
+   - Scan changes against USER_GUIDE.md
+   - List any features that need USER_GUIDE updates
+   - Scan changes against ONBOARDING.md
+   - List any onboarding elements that need updates
+
+3. **Check GREENFIELD Alignment**
+   - Spawn \`strategy-agent\` to compare BROWNFIELD against GREENFIELD
+   - Ask user: "Do you see any misalignment between your vision (GREENFIELD) and what's implemented (BROWNFIELD)?"
+   - If misalignment reported, add to Strategy Changelog
+
+4. **Generate Production Readiness Report**
+   \`\`\`
+   ## Production Readiness: Implementation Check
+
+   ### BROWNFIELD Status
+   - Last Updated: YYYY-MM-DD
+   - New Features: X added
+   - Removed Features: X removed
+   - Modified Features: X changed
+
+   ### Documentation Impact
+   - USER_GUIDE.md needs updates: [list or "None"]
+   - ONBOARDING.md needs updates: [list or "None"]
+
+   ### Strategy Alignment
+   - GREENFIELD vision: [summary]
+   - BROWNFIELD reality: [summary]
+   - Alignment: High/Medium/Low
+
+   ### Recommendation
+   [Ready for production / Needs attention: ...]
+   \`\`\`
+
+5. **Ask for Confirmation**
+   - "Production check complete. Ready to proceed with deployment?"
+   - Wait for user confirmation before any further action
+
+**Note:** This phrase focuses on implementation status and alignment. Use "close the farm" for code quality gates and pushing to remote.
+
+---
+
+## Planning Protocol
+
+**IMPORTANT**: When entering a planning phase for any feature, ALL plans MUST:
+
+### Step 1: Save Plan to \`_PLANS/\`
+Before completing the planning phase, the plan MUST be saved to \`_PLANS/<FEATURE_NAME>.md\`:
+- Use SCREAMING_SNAKE_CASE for filename
+- Include: overview, technical approach, files to modify, implementation steps, risks
+
+### Step 2: Create Implementation Tracking
+After user approves:
+1. Exit the planning phase
+2. Create a beads Epic for the feature
+3. Create child issues from plan steps
+
+### Step 3: Confirm Before Implementation
+1. Show the created Epic and issues
+2. **Always ask**: "Ready to start implementing?"
+3. Wait for explicit user confirmation
+
+---
+
+## Project Configuration
+
+- **Test Command:** \`${answers.testCommand}\`
+- **Build Command:** \`${answers.buildCommand}\`
+- **Lint Command:** \`${answers.lintCommand}\`
+
+---
+
+## Tips for AI Assistants
+
+### When Working on Features
+- Always check the justfile: \`just --list\`
+- Create issues before starting work
+- Use "make a plan for..." for non-trivial features
+
+### Before Committing
+\`\`\`bash
+${answers.lintCommand}    # Check code quality
+${answers.buildCommand}   # Verify compilation
+\`\`\`
+
+---
+
+## Directory Structure
+
+This project uses a structured directory layout for AI-assisted development:
+
+| Directory | Purpose |
+|-----------|---------|
+| \`_AUDIT/\` | Audit documents and health metrics |
+| \`_PLANS/\` | Feature implementation plans |
+| \`_RESEARCH/\` | Research documents |
+| \`_OFFICE/\` | Strategy and UX documentation |
+`;
+
+  await fs.writeFile(path.join(cwd, "AGENTS.md"), content);
+}
+
 async function createFarmhouseMd(cwd, answers) {
   const today = new Date().toISOString().split("T")[0];
 
@@ -809,7 +1178,7 @@ async function createFarmhouseMd(cwd, answers) {
 | Metric | Count |
 |--------|-------|
 | Commands | 2 |
-| Agents | 15 |
+| Agents | 13 |
 | Office Docs | 3 |
 | Research Docs | 0 |
 | Justfile Recipes | 11 |
@@ -830,7 +1199,6 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 | Command | Description |
 |---------|-------------|
 | \`/push\` | Clean, lint, test, build, commit, push, update metrics |
-| \`/office\` | Interactive strategy and UX command - updates CORE_LOOP, ONBOARDING, USER_GUIDE |
 
 ---
 
@@ -839,18 +1207,16 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 | Agent | Purpose |
 |-------|---------|
 | \`the-farmer\` | Audit and update FARMHOUSE.md metrics |
-| \`code-reviewer\` | Quality & security code review |
+| \`code-quality\` | Code review, DRY violations, complexity, naming |
 | \`security-auditor\` | OWASP vulnerability scanning |
 | \`performance-auditor\` | Performance anti-patterns |
-| \`code-smell-auditor\` | DRY violations, complexity, naming |
 | \`accessibility-auditor\` | WCAG 2.1 compliance, alt text, contrast |
-| \`unused-code-cleaner\` | Detect and remove dead code |
-| \`code-cleaner\` | Remove comments and console.logs |
+| \`code-cleaner\` | Remove dead code, comments, console.logs |
 | \`i18n-locale-translator\` | Translate UI text to locales |
-| \`storybook-maintainer\` | Create/update Storybook stories |
 | \`idea-gardener\` | Manage Idea Garden and Compost |
 | \`researcher\` | Systematic research before planning |
-| \`strategy-agent\` | Analyze core loop strategy (what/stopping/why) |
+| \`strategy-agent\` | Analyze GREENFIELD.md vision and strategy (what/stopping/why) |
+| \`brownfield-agent\` | Track implemented features in BROWNFIELD.md |
 | \`onboarding-agent\` | Document onboarding elements (tours, tooltips, modals) |
 | \`user-guide-agent\` | Create feature documentation for help docs |
 
@@ -894,7 +1260,8 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 
 | Phrase | Action |
 |--------|--------|
-| \`go to production\` | UX production check: update _OFFICE/ docs |
+| \`setup office\` | Interactive guided setup: GREENFIELD, ONBOARDING, USER_GUIDE |
+| \`go to production\` | Update BROWNFIELD.md, check alignment, note doc impacts |
 
 ---
 
@@ -1099,42 +1466,65 @@ _No composted ideas yet._
 async function createOfficeDocs(cwd, answers) {
   const today = new Date().toISOString().split("T")[0];
 
-  // Create CORE_LOOP.md - Strategy document
-  const coreLoopContent = `# Core Loop Strategy
+  // Create GREENFIELD.md - Vision & Strategy document (replaces CORE_LOOP.md)
+  const greenfieldContent = `# Greenfield Vision
 
-> Treat your product like a game. Define what users are doing, what's stopping them, and why they're doing it.
-> This is a living strategy document - update it as your understanding evolves.
+> Your product vision and strategic direction. Focus on WHAT you're building, not HOW.
+> This is a living document that adapts as your understanding evolves.
 
+**Project Name:** ${answers.projectName}
 **Last Updated:** ${today}
 **Status:** Initial setup
 **Confidence:** Low
 
 ---
 
-## The Three Questions
+## Core Idea
+
+_What is this product in one sentence?_
+
+[Describe your product's core purpose]
+
+---
+
+## Problem Being Solved
+
+_What pain point or need does this address?_
+
+**The Problem:**
+[Describe the problem users face]
+
+**Why It Matters:**
+[Explain the impact of solving this problem]
+
+---
+
+## The Game Loop (Strategy)
+
+> Treat your product like a game. What keeps users engaged?
 
 ### 1. What are they doing?
-_What is the primary action or loop your users engage in?_
+_The primary action or loop users engage in_
 
-**Current Understanding:**
-[Describe the core user action/loop]
+**Core Action:**
+[Describe the main user activity]
 
 ### 2. What's stopping them?
-_What friction, obstacles, or pain points prevent users from succeeding?_
+_Friction, obstacles, or pain points_
 
 **Current Blockers:**
 - [Blocker 1]
 - [Blocker 2]
 
 ### 3. Why are they doing it?
-_What motivates users? What's the deeper goal or reward?_
+_Underlying motivation and rewards_
 
 **User Motivation:**
-[Describe the underlying motivation]
+[Describe what drives users]
 
 ---
 
-## Core Loop Diagram
+## Vision Loop
 
 \`\`\`
 [Entry Point] → [Core Action] → [Reward/Feedback] → [Loop Back]
@@ -1142,21 +1532,144 @@ _What motivates users? What's the deeper goal or reward?_
 
 ---
 
+## Strategic Pillars
+
+_Key principles that guide product decisions_
+
+1. **[Pillar 1]** - [Description]
+2. **[Pillar 2]** - [Description]
+3. **[Pillar 3]** - [Description]
+
+---
+
+## Success Metrics
+
+| Metric | Current | Target | Notes |
+|--------|---------|--------|-------|
+| [Metric 1] | TBD | [goal] | |
+| [Metric 2] | TBD | [goal] | |
+
+---
+
 ## Strategy Changelog
 
 | Date | Change | Previous | Reason |
 |------|--------|----------|--------|
-| ${today} | Initial strategy setup | - | Created via farmwork init |
+| ${today} | Initial vision setup | - | Created via farmwork init |
 
 ---
 
 ## Related Documents
 
+- [BROWNFIELD.md](./_OFFICE/BROWNFIELD.md) - What's already implemented
 - [ONBOARDING.md](./_OFFICE/ONBOARDING.md) - First-time user experience
 - [USER_GUIDE.md](./_OFFICE/USER_GUIDE.md) - Feature documentation
 `;
 
-  await fs.writeFile(path.join(cwd, "_OFFICE", "CORE_LOOP.md"), coreLoopContent);
+  await fs.writeFile(path.join(cwd, "_OFFICE", "GREENFIELD.md"), greenfieldContent);
+
+  // Create BROWNFIELD.md - Implementation Status document
+  const brownfieldContent = `# Brownfield Status
+
+> What's already implemented. Focus on WHAT exists, not HOW it works.
+> Updated during "go to production" to track solidified features.
+
+**Last Updated:** ${today}
+**Status:** Initial setup
+**Implemented Features:** 0
+
+---
+
+## Current State
+
+_High-level summary of what the app currently does_
+
+[Describe current implementation state]
+
+---
+
+## Solidified Features
+
+_Features that are complete and stable_
+
+<!-- Feature format:
+### Feature Name
+**Status:** Complete | Stable | Production-ready
+**Added:** YYYY-MM-DD
+
+Brief description of what this feature does.
+
+**Capabilities:**
+- Capability 1
+- Capability 2
+-->
+
+_No features solidified yet._
+
+---
+
+## Recent Changes
+
+_Features added or removed in recent production cycles_
+
+### Added
+| Feature | Date | Notes |
+|---------|------|-------|
+| | | |
+
+### Removed
+| Feature | Date | Reason |
+|---------|------|--------|
+| | | |
+
+### Modified
+| Feature | Date | Change |
+|---------|------|--------|
+| | | |
+
+---
+
+## Workflows
+
+_User workflows that are implemented_
+
+<!-- Workflow format:
+### Workflow Name
+1. Step 1
+2. Step 2
+3. Step 3
+-->
+
+_No workflows documented yet._
+
+---
+
+## Technical Constraints
+
+_Implementation decisions that affect future development_
+
+| Constraint | Reason | Impact |
+|------------|--------|--------|
+| | | |
+
+---
+
+## Production History
+
+| Date | Version | Changes Summary |
+|------|---------|-----------------|
+| ${today} | Initial | Created via farmwork init |
+
+---
+
+## Related Documents
+
+- [GREENFIELD.md](./_OFFICE/GREENFIELD.md) - Vision and strategy
+- [ONBOARDING.md](./_OFFICE/ONBOARDING.md) - First-time user experience
+- [USER_GUIDE.md](./_OFFICE/USER_GUIDE.md) - Feature documentation
+`;
+
+  await fs.writeFile(path.join(cwd, "_OFFICE", "BROWNFIELD.md"), brownfieldContent);
 
   // Create ONBOARDING.md - Onboarding tracker
   const onboardingContent = `# User Onboarding
@@ -1232,6 +1745,14 @@ _What users see before they have data_
 | Date | Change | Reason |
 |------|--------|--------|
 | ${today} | Initial onboarding setup | Created via farmwork init |
+
+---
+
+## Related Documents
+
+- [GREENFIELD.md](./_OFFICE/GREENFIELD.md) - Vision and strategy
+- [BROWNFIELD.md](./_OFFICE/BROWNFIELD.md) - What's already implemented
+- [USER_GUIDE.md](./_OFFICE/USER_GUIDE.md) - Feature documentation
 `;
 
   await fs.writeFile(path.join(cwd, "_OFFICE", "ONBOARDING.md"), onboardingContent);
@@ -1276,7 +1797,7 @@ Brief description of what this feature does.
 **Related:** [Link to related feature]
 -->
 
-_No features documented yet. Run \`/office\` to add features._
+_No features documented yet. Say "setup office" to add features._
 
 ---
 
@@ -1301,6 +1822,14 @@ _No FAQs yet._
 | Date | Change |
 |------|--------|
 | ${today} | Initial user guide setup |
+
+---
+
+## Related Documents
+
+- [GREENFIELD.md](./_OFFICE/GREENFIELD.md) - Vision and strategy
+- [BROWNFIELD.md](./_OFFICE/BROWNFIELD.md) - What's already implemented
+- [ONBOARDING.md](./_OFFICE/ONBOARDING.md) - First-time user experience
 `;
 
   await fs.writeFile(path.join(cwd, "_OFFICE", "USER_GUIDE.md"), userGuideContent);
@@ -1480,22 +2009,32 @@ Read all documents in \`_RESEARCH/\` and check their age:
 ### Score: X/10
 \`\`\`
 `,
-    "code-reviewer.md": `---
-name: code-reviewer
-description: Review code for quality, security, and maintainability
-tools: Read, Grep, Glob, Bash
+    "code-quality.md": `---
+name: code-quality
+description: Review code for quality, maintainability, DRY violations, and code smells
+tools: Read, Grep, Glob, Edit
 model: opus
 ---
 
-# Code Reviewer Agent
+# Code Quality Agent
 
-Reviews staged/modified files for:
-- Security vulnerabilities
-- Performance issues
-- Code quality problems
+Comprehensive code quality review covering:
+
+## Code Review
+- Readability and maintainability
 - Best practice violations
+- Error handling patterns
+- API design issues
 
-Reports findings with severity (CRITICAL, HIGH, MEDIUM, LOW) and remediation steps.
+## Code Smells
+- DRY violations (duplicated code)
+- Complexity issues (functions > 50 lines, deep nesting)
+- Naming issues (misleading names, abbreviations)
+- Magic values (hardcoded numbers/strings)
+- Technical debt (TODO, FIXME, HACK comments)
+
+Reports findings with severity (CRITICAL, HIGH, MEDIUM, LOW).
+Updates \`_AUDIT/CODE_QUALITY.md\` with results.
 `,
     "security-auditor.md": `---
 name: security-auditor
@@ -1535,25 +2074,6 @@ Scans for performance anti-patterns:
 Reports findings with impact assessment.
 Updates \`_AUDIT/PERFORMANCE.md\` with results.
 `,
-    "code-smell-auditor.md": `---
-name: code-smell-auditor
-description: Detect DRY violations, complexity issues, naming problems, and technical debt
-tools: Read, Grep, Glob, Edit
-model: opus
----
-
-# Code Smell Auditor Agent
-
-Scans for code quality issues:
-- DRY violations (duplicated code)
-- Complexity issues (functions > 50 lines, deep nesting)
-- Naming issues (misleading names, abbreviations)
-- Magic values (hardcoded numbers/strings)
-- Technical debt (TODO, FIXME, HACK comments)
-
-Reports code health as GOOD / FAIR / NEEDS ATTENTION.
-Updates \`_AUDIT/CODE_QUALITY.md\` with results.
-`,
     "accessibility-auditor.md": `---
 name: accessibility-auditor
 description: WCAG 2.1 accessibility auditing for React/Next.js applications
@@ -1574,37 +2094,22 @@ Scans for WCAG 2.1 Level AA compliance issues:
 Reports findings by severity (CRITICAL, HIGH, MEDIUM, LOW).
 Updates \`_AUDIT/ACCESSIBILITY.md\` with results.
 `,
-    "unused-code-cleaner.md": `---
-name: unused-code-cleaner
-description: Detect and remove unused code (imports, functions, variables)
-tools: Read, Write, Edit, Bash, Grep, Glob
-model: opus
----
-
-# Unused Code Cleaner Agent
-
-Detects and removes unused code:
-- Unused imports
-- Unused functions and classes
-- Unused variables
-- Dead code paths
-- Console.log statements (optional)
-- Comments (preserves JSDoc)
-
-Use after refactoring, when removing features, or before production deployment.
-`,
     "code-cleaner.md": `---
 name: code-cleaner
-description: Fast removal of comments, console.logs, and debug code while preserving JSDoc
-tools: Read, Edit, Glob, Grep
+description: Remove dead code, unused imports, comments, and console.logs while preserving JSDoc
+tools: Read, Write, Edit, Bash, Grep, Glob
 model: opus
 ---
 
 # Code Cleaner Agent
 
-Fast cleanup of TypeScript/JavaScript files:
+Comprehensive code cleanup for TypeScript/JavaScript files.
 
 ## Removes
+- Unused imports
+- Unused functions and classes
+- Unused variables
+- Dead code paths
 - Line comments (\`//\`)
 - Block comments (\`/* */\`)
 - \`console.log\` statements
@@ -1612,6 +2117,8 @@ Fast cleanup of TypeScript/JavaScript files:
 ## Preserves
 - JSDoc comments (\`/** */\`)
 - \`console.error\`, \`console.warn\`, \`console.info\`
+
+Use after refactoring, when removing features, or before production deployment.
 `,
     "i18n-locale-translator.md": `---
 name: i18n-locale-translator
@@ -1629,23 +2136,6 @@ Handles internationalization tasks:
 - Update components to use translation hooks
 
 Use when adding new features or internationalizing existing hardcoded text.
-`,
-    "storybook-maintainer.md": `---
-name: storybook-maintainer
-description: Create and update Storybook stories for UI components
-tools: Read, Write, Edit, Glob, Grep
-model: opus
----
-
-# Storybook Maintainer Agent
-
-Manages Storybook stories for UI components:
-- Analyze component props and variants
-- Create comprehensive story files
-- Document component usage
-- Add controls for interactive props
-
-Use when adding new components or when existing components change significantly.
 `,
     "idea-gardener.md": `---
 name: idea-gardener
@@ -1963,65 +2453,141 @@ Next steps:
 `,
     "strategy-agent.md": `---
 name: strategy-agent
-description: Analyze and update the core loop strategy - what users do, what stops them, why they do it
+description: Analyze and update GREENFIELD.md - product vision, core loop strategy, and strategic alignment
 tools: Read, Edit, Glob, Grep, Task
 model: opus
 ---
 
 # Strategy Agent
 
-Maintains \`_OFFICE/CORE_LOOP.md\` - the living strategy document for product thinking.
+Maintains \`_OFFICE/GREENFIELD.md\` - the living vision and strategy document.
 
 ## Core Responsibility
 
-Treat the product like a game and answer three fundamental questions:
-1. **What are they doing?** - The primary user action/loop
-2. **What's stopping them?** - Friction and obstacles
-3. **Why are they doing it?** - Underlying motivation and rewards
+Define and refine the product vision focusing on WHAT, not HOW:
+1. **Core Idea** - What is this product?
+2. **Problem Being Solved** - What pain point does it address?
+3. **The Game Loop** - What are they doing / What's stopping them / Why are they doing it
 
 ## Instructions
 
-### When Invoked via /office
+### When Invoked via "setup office"
 
-1. Read \`_OFFICE/CORE_LOOP.md\` to understand current strategy
-2. Read the codebase to understand the product (components, routes, features)
-3. Ask the user probing questions:
-   - "What's the main thing users do in your app?"
-   - "Where do users get stuck or confused?"
-   - "What's the 'aha moment' for users?"
-   - "What brings users back?"
-4. Update CORE_LOOP.md with insights
-5. Add entry to Strategy Changelog table
+Interactive setup mode:
+1. Ask user for project vision in one sentence
+2. Ask about the problem being solved
+3. Guide through game loop questions (What/Stopping/Why)
+4. Ask about strategic pillars (optional)
+5. Create/update GREENFIELD.md with answers
+6. Add entry to Strategy Changelog
 
 ### When Checking for Production ("go to production")
 
-1. Read \`_OFFICE/CORE_LOOP.md\`
-2. Compare current date to Last Updated date
-3. If changed since last production push:
-   - Summarize strategy changes
-   - Add audit entry to changelog
-4. Report strategy status
+Alignment check mode:
+1. Read \`_OFFICE/GREENFIELD.md\` (vision)
+2. Read \`_OFFICE/BROWNFIELD.md\` (implementation)
+3. Compare vision against reality
+4. Ask user: "Do you see any misalignment between your vision and what's implemented?"
+5. If misalignment, document in Strategy Changelog
+6. Report alignment status (High/Medium/Low)
+
+### Probing Questions for Vision
+
+- "What is this product in one sentence?"
+- "What problem does it solve for users?"
+- "What's the main thing users DO in your app?"
+- "What prevents users from succeeding?"
+- "What motivates users to return?"
+- "What are 2-3 key principles that guide your decisions?"
 
 ## Output Format
 
 \`\`\`
-## Strategy Analysis
+## Vision Analysis
 
-### Core Loop
-[Describe the identified core loop]
+### Core Idea
+[One-sentence product description]
 
-### Key Friction Points
-- [Friction 1]
-- [Friction 2]
+### Problem
+[Problem being solved]
 
-### User Motivation
-[Describe why users engage]
+### Game Loop
+- Action: [What users do]
+- Blockers: [What stops them]
+- Motivation: [Why they do it]
 
-### Recommendations
-- [Recommendation 1]
-- [Recommendation 2]
+### Strategic Pillars
+1. [Pillar 1]
+2. [Pillar 2]
+3. [Pillar 3]
 
-Updated _OFFICE/CORE_LOOP.md
+Updated _OFFICE/GREENFIELD.md
+\`\`\`
+`,
+    "brownfield-agent.md": `---
+name: brownfield-agent
+description: Track implemented features and changes in BROWNFIELD.md during production cycles
+tools: Read, Edit, Glob, Grep, Task
+model: opus
+---
+
+# Brownfield Agent
+
+Maintains \`_OFFICE/BROWNFIELD.md\` - tracking what's actually implemented.
+
+## Core Responsibility
+
+Document the current state of implementation focusing on WHAT exists, not HOW:
+- Solidified features
+- Recent additions and removals
+- User workflows
+- Technical constraints
+
+## Instructions
+
+### When Invoked via "go to production"
+
+1. Read current \`_OFFICE/BROWNFIELD.md\`
+2. Scan the codebase for implemented features:
+   - Check routes, pages, and main components
+   - Look for feature flags or feature directories
+   - Identify user-facing functionality
+3. Compare against last production snapshot
+4. Document changes:
+   - **Added:** New features since last production
+   - **Removed:** Features that were removed
+   - **Modified:** Significant changes to existing features
+5. Update Solidified Features section for stable features
+6. Update Production History table
+7. Update Last Updated date
+
+### When Checking Alignment
+
+1. List all solidified features
+2. List all documented workflows
+3. Compare against GREENFIELD.md vision
+4. Identify any gaps or misalignment
+
+## Output Format
+
+\`\`\`
+## Implementation Status
+
+### Current Features
+- Feature A (stable)
+- Feature B (new)
+- Feature C (modified)
+
+### Changes This Cycle
+- Added: [list]
+- Removed: [list]
+- Modified: [list]
+
+### Workflows Documented
+- Workflow 1: [X steps]
+- Workflow 2: [Y steps]
+
+Updated _OFFICE/BROWNFIELD.md
 \`\`\`
 `,
     "onboarding-agent.md": `---
@@ -2047,7 +2613,7 @@ Identify, document, and track all onboarding-related UI elements:
 
 ## Instructions
 
-### When Invoked via /office
+### When Invoked via "setup office"
 
 1. Read \`_OFFICE/ONBOARDING.md\` to understand current state
 2. Scan the codebase for onboarding elements:
@@ -2114,7 +2680,7 @@ Create and maintain user-facing documentation for features:
 
 ## Instructions
 
-### When Invoked via /office
+### When Invoked via "setup office"
 
 1. Read \`_OFFICE/USER_GUIDE.md\` to understand current documentation
 2. Scan the codebase for features:
@@ -2181,28 +2747,10 @@ Updated _OFFICE/USER_GUIDE.md
 async function createCommands(cwd, answers) {
   const pm = answers.packageManager || "npm";
 
-  const storybookSteps = answers.includeStorybook
-    ? `
-
-### Step 9: Deploy Storybook to Netlify
-
-Deploy the Storybook documentation site:
-\`\`\`bash
-npx netlify deploy --dir=storybook-static --site=$NETLIFY_STORYBOOK_SITE_ID --prod
-\`\`\`
-
-Note: Requires \`NETLIFY_AUTH_TOKEN\` and \`NETLIFY_STORYBOOK_SITE_ID\` in \`.claude/settings.local.json\`.
-If not configured, skip this step and inform the user to add the env vars.
-
-Storybook URL: https://${answers.storybookUrl || "storybook.example.com"}
-${answers.passwordProtect ? "**Note:** This Storybook is password protected." : ""}
-`
-    : "";
-
   const pushCommand = `---
 description: Clean, stage, lint, test, build, commit, push, and update metrics
 argument-hint: [optional: commit message override]
-allowed-tools: Bash(find:*), Bash(git:*), Bash(${pm}:*), Bash(npx:*)${answers.includeStorybook ? ", Bash(npx netlify:*)" : ""}, Task
+allowed-tools: Bash(find:*), Bash(git:*), Bash(${pm}:*), Bash(npx:*), Task
 ---
 
 # Push Command
@@ -2257,9 +2805,9 @@ git add -A
 
 Run each check. If any fails, stop and report which check failed:
 
-1. **Lint**: \`${answers.lintCommand}\`${answers.includeStorybook ? `\n2. **Storybook**: \`${pm} run build-storybook\`` : ""}
-${answers.includeStorybook ? "3" : "2"}. **Unit Tests**: \`${answers.testCommand}\`
-${answers.includeStorybook ? "4" : "3"}. **Build**: \`${answers.buildCommand}\`
+1. **Lint**: \`${answers.lintCommand}\`
+2. **Unit Tests**: \`${answers.testCommand}\`
+3. **Build**: \`${answers.buildCommand}\`
 
 ### Step 7: Generate Commit Message
 
@@ -2286,8 +2834,8 @@ Then push to remote:
 \`\`\`bash
 git push
 \`\`\`
-${storybookSteps}
-### Step 10: Update Farmhouse Metrics
+
+### Step 9: Update Farmhouse Metrics
 
 Run the-farmer agent to update \`_AUDIT/FARMHOUSE.md\` with current metrics:
 - Commands and agents inventory
@@ -2296,12 +2844,12 @@ Run the-farmer agent to update \`_AUDIT/FARMHOUSE.md\` with current metrics:
 
 This keeps the harness documentation in sync with the codebase.
 
-### Step 11: Report Success
+### Step 10: Report Success
 
 Show a summary:
 - Files changed
 - Commit hash
-- Push status${answers.includeStorybook ? "\n- Storybook deploy status (if deployed)" : ""}
+- Push status
 - Harness metrics updated
 `;
 
@@ -2310,181 +2858,15 @@ Show a summary:
     pushCommand,
   );
 
-  // Create /office command
-  const officeCommand = `---
-description: Interactive strategy and user experience command - updates CORE_LOOP, ONBOARDING, and USER_GUIDE
-argument-hint: [optional: focus area - strategy|onboarding|guide|all]
-allowed-tools: Read, Edit, Glob, Grep, Task
----
-
-# Office Command
-
-Interactive command for product strategy and user experience documentation.
-Updates all three \`_OFFICE/\` documents based on user answers.
-
-## Usage
-
-\`\`\`
-/office           # Run full office check (all areas)
-/office strategy  # Focus on core loop strategy
-/office onboarding # Focus on onboarding elements
-/office guide     # Focus on user documentation
-\`\`\`
-
-## Workflow
-
-### Step 1: Determine Focus Area
-
-If \`$ARGUMENTS\` is provided, focus on that area:
-- \`strategy\` or \`core\` or \`loop\` → Core loop only
-- \`onboarding\` or \`tour\` or \`welcome\` → Onboarding only
-- \`guide\` or \`docs\` or \`help\` → User guide only
-- \`all\` or empty → All three areas
-
-### Step 2: Run Strategy Analysis (if applicable)
-
-Spawn \`strategy-agent\` subagent to:
-1. Read current \`_OFFICE/CORE_LOOP.md\`
-2. Analyze the codebase to understand the product
-3. Ask user questions about the core loop:
-   - "What is the main action users take in your app?"
-   - "What prevents users from succeeding?"
-   - "What motivates users to return?"
-4. Update CORE_LOOP.md with findings
-5. Add changelog entry
-
-### Step 3: Run Onboarding Analysis (if applicable)
-
-Spawn \`onboarding-agent\` subagent to:
-1. Read current \`_OFFICE/ONBOARDING.md\`
-2. Scan codebase for onboarding elements:
-   - Tour libraries (react-joyride, shepherd.js, intro.js)
-   - Modal/popup components
-   - Tooltip implementations
-   - Empty state components
-3. Ask user questions:
-   - "What should new users see first?"
-   - "What's the key 'aha moment'?"
-   - "Any existing tours or tooltips?"
-4. Update ONBOARDING.md tables
-5. Add changelog entry
-
-### Step 4: Run User Guide Analysis (if applicable)
-
-Spawn \`user-guide-agent\` subagent to:
-1. Read current \`_OFFICE/USER_GUIDE.md\`
-2. Scan codebase for features:
-   - Routes and pages
-   - User-facing components
-   - Keyboard shortcuts
-3. Ask user questions:
-   - "What are the main features?"
-   - "Common user questions?"
-   - "Any shortcuts to document?"
-4. Create/update feature documentation blocks
-5. Add changelog entry
-
-### Step 5: Generate Summary Report
-
-Display a summary of all updates:
-
-\`\`\`
-## Office Update Complete
-
-### Core Loop Strategy
-- Updated: Yes/No
-- Confidence: High/Medium/Low
-- Changes: [summary of changes]
-
-### Onboarding
-- Elements Found: X
-- Gaps Identified: X
-- Changes: [summary of changes]
-
-### User Guide
-- Features Documented: X
-- Missing: X
-- Changes: [summary of changes]
-
-### Next Steps
-- [ ] Review _OFFICE/CORE_LOOP.md
-- [ ] Add missing onboarding elements
-- [ ] Document new features
-\`\`\`
-
-## Interactive Question Flow
-
-The /office command uses a conversational approach:
-
-1. **Introduction**: "Let's update your product office documents. I'll ask some questions about your product strategy and user experience."
-
-2. **Strategy Questions** (if running strategy):
-   - "In one sentence, what do users primarily DO in your app?"
-   - "What's the biggest friction point or obstacle for users?"
-   - "What's the core reward or motivation that keeps users engaged?"
-
-3. **Onboarding Questions** (if running onboarding):
-   - "Describe what a new user sees on their first visit"
-   - "What's the 'aha moment' you want to guide new users to?"
-   - "Do you have any guided tours, tooltips, or welcome modals?"
-
-4. **Guide Questions** (if running guide):
-   - "What are the top 3-5 features users should know about?"
-   - "What questions do users commonly ask?"
-   - "Are there keyboard shortcuts or power-user features?"
-
-5. **Confirmation**: Ask user to confirm updates before writing to files.
-`;
-
-  await fs.writeFile(
-    path.join(cwd, ".claude", "commands", "office.md"),
-    officeCommand,
-  );
 }
 
 async function createSettings(cwd, answers) {
-  if (answers.includeStorybook && answers.netlifyAuthToken) {
-    const localSettings = {
-      env: {
-        NETLIFY_AUTH_TOKEN: answers.netlifyAuthToken,
-        NETLIFY_STORYBOOK_SITE_ID: answers.netlifySiteId,
-      },
-    };
-
-    await fs.writeFile(
-      path.join(cwd, ".claude", "settings.local.json"),
-      JSON.stringify(localSettings, null, 2),
-    );
-
-    const gitignorePath = path.join(cwd, ".gitignore");
-    let gitignoreContent = "";
-    try {
-      gitignoreContent = await fs.readFile(gitignorePath, "utf-8");
-    } catch {
-      // .gitignore doesn't exist yet
-    }
-
-    const entriesToAdd = [".claude/settings.local.json", "storybook-static/"];
-
-    const linesToAdd = entriesToAdd.filter(
-      (entry) => !gitignoreContent.includes(entry),
-    );
-
-    if (linesToAdd.length > 0) {
-      const newContent =
-        gitignoreContent.trim() +
-        (gitignoreContent.trim() ? "\n\n" : "") +
-        "# Farmwork - Storybook deployment\n" +
-        linesToAdd.join("\n") +
-        "\n";
-      await fs.writeFile(gitignorePath, newContent);
-    }
-  }
+  // Settings function reserved for future use
 }
 
 async function createProduceConfig(cwd, answers) {
   const config = {
-    version: "1.2.0",
+    version: "1.3.0",
     projectName: answers.projectName,
     commands: {
       test: answers.testCommand,
@@ -2492,20 +2874,10 @@ async function createProduceConfig(cwd, answers) {
       lint: answers.lintCommand,
     },
     features: {
-      storybook: answers.includeStorybook || false,
       i18n: answers.includeI18n || false,
     },
-    audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "ACCESSIBILITY", "CODE_QUALITY", "TESTS", "GARDEN", "COMPOST", "RESEARCH"],
+    audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "ACCESSIBILITY", "CODE_QUALITY", "TESTS", "GARDEN", "COMPOST", "RESEARCH", "GREENFIELD", "BROWNFIELD"],
   };
-
-  if (answers.includeStorybook) {
-    config.storybook = {
-      url: answers.storybookUrl || null,
-      passwordProtected: answers.passwordProtect || false,
-      deployCommand:
-        "npx netlify deploy --dir=storybook-static --site=$NETLIFY_STORYBOOK_SITE_ID --prod",
-    };
-  }
 
   await fs.writeFile(
     path.join(cwd, ".farmwork.json"),
