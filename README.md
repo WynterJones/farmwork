@@ -1,4 +1,4 @@
-<img src="/images/init.png" alt="Farmwork - Developer Methodology" width="500" />
+<img src="logo.png" alt="Farmwork - Developer Methodology" width="300" />
 
 > A workflow framework for Claude Code by Wynter Jones
 
@@ -27,66 +27,39 @@ npx farmwork init
 
 ### Core Concepts
 
-1. **FARMHOUSE.md** - Central command for tracking framework metrics
-2. **Phrase Commands** - Natural language triggers for workflows
-3. **Agents** - Specialized AI subagents for specific tasks
-4. **Autonomously Issue Tracking** - Using beads (`bd`) for full visibility
+1. **Skills** - Auto-activating workflows that respond to natural phrases
+2. **Slash Commands** - Explicit triggers for actions like `/push`
+3. **Agents** - 15 specialized AI subagents for specific tasks
+4. **Issue Tracking** - Using beads (`bd`) for full visibility
 5. **Living Audits** - Documents that track ongoing concerns
-6. **Plan & Implement** - You describe the outcome, the rest is handled, tracked and audited
-7. **Idea Garden & Compost** - Pre-plan creative stage with natural aging (ideas older than 60 days auto-compost)
+6. **Plan & Implement** - You describe the outcome, the rest is handled
+7. **Idea Garden** - Pre-plan creative stage with natural aging
 
-### Phrase Commands
+### Skills (Auto-Activating Workflows)
 
-**Farmwork Phrases** (Development Workflow):
-| Phrase | Action |
-|--------|--------|
-| `open the farm` | Audit systems, update FARMHOUSE.md metrics |
-| `count the herd` | Full inspection and audit |
-| `go to market` | i18n translation check + accessibility audit |
-| `close the farm` | Full push workflow (lint, test, build, commit, push) |
+Skills auto-activate when you use these natural phrases:
 
-**Plan Phrases**:
-| Phrase | Action |
-|--------|--------|
-| `make a plan for...` | Create implementation plan in `_PLANS/` |
-| `let's implement...` | Execute plan with issue tracking |
+| Phrase | Skill | What Happens |
+|--------|-------|--------------|
+| `open the farm` | farm-audit | Audit systems, update FARMHOUSE.md |
+| `count the herd` | farm-inspect | Full code inspection (no push) |
+| `go to market` | market | i18n + WCAG accessibility audit |
+| `go to production` | production | Update BROWNFIELD, strategy check |
+| `I have an idea for...` | garden | Plant idea in GARDEN.md |
+| `water the garden` | garden | Generate 10 new ideas |
+| `compost this...` | garden | Move idea to COMPOST.md |
+| `let's research...` | research | Create/update _RESEARCH/ doc |
 
-**Idea Phrases** (Pre-Plan Stage):
-| Phrase | Action |
-|--------|--------|
-| `I have an idea for...` | Add new idea to `_AUDIT/GARDEN.md` with planted date |
-| `let's plan this idea...` | Graduate idea from GARDEN → create plan |
-| `compost this...` | Move rejected idea to `_AUDIT/COMPOST.md` |
-| `water the garden` | Generate 10 new ideas based on GARDEN and COMPOST |
-
-**Idea Lifecycle:**
-- **Fresh** (0-44 days) - New ideas ready to develop
-- **Wilting** (45-60 days) - Ideas aging, marked ⚠️ during audits
-- **Composted** (60+ days) - Auto-moved to COMPOST during "open the farm"
-
-**Research Phrases** (Pre-Plan Stage):
-| Phrase | Action |
-|--------|--------|
-| `let's research...` | Create or update research document in `_RESEARCH/` |
-| `update research on...` | Refresh existing research with new findings |
-| `show research on...` | Display research summary and staleness status |
-
-**Research Lifecycle:**
-- **Fresh** (0-14 days) - Research is current and reliable
-- **Aging** (15-30 days) - Consider refreshing for major decisions
-- **Stale** (30+ days) - Recommend updating before using for plans
-
-**Office Phrases** (Product Strategy & UX):
-| Phrase | Action |
-|--------|--------|
-| `go to production` | UX production check: update `_OFFICE/` docs with audit trail |
-
-### Slash Commands
+### Slash Commands (Explicit Actions)
 
 | Command | Description |
 |---------|-------------|
-| `/push` | Clean, stage, lint, test, build, commit, push, update metrics (11 steps) |
-| `/office` | Interactive strategy and UX command - updates CORE_LOOP, ONBOARDING, USER_GUIDE |
+| `/push` | Lint, test, build, commit, push (11 steps) |
+| `/office` | Interactive strategy setup |
+
+### Skill Activation Hook
+
+Farmwork adds a `UserPromptSubmit` hook that reminds Claude to check for applicable skills. This improves activation reliability over phrase commands in CLAUDE.md.
 
 ### Agents
 
@@ -126,49 +99,37 @@ You can `go to market` when you have a production-ready app with international u
 
 ```
 your-project/
-├── CLAUDE.md           # Main instructions & phrase commands
+├── CLAUDE.md           # Lean instructions (references skills)
 ├── .claude/            # Claude Code configuration
+│   ├── skills/         # Auto-activating workflows (NEW!)
+│   │   ├── farm-audit/     # "open the farm"
+│   │   ├── farm-inspect/   # "count the herd"
+│   │   ├── garden/         # idea management
+│   │   ├── research/       # "let's research..."
+│   │   ├── production/     # "go to production"
+│   │   └── market/         # "go to market"
 │   ├── agents/         # 15 specialized subagents
 │   │   ├── the-farmer.md
 │   │   ├── code-reviewer.md
 │   │   ├── security-auditor.md
-│   │   ├── performance-auditor.md
-│   │   ├── code-smell-auditor.md
-│   │   ├── accessibility-auditor.md
-│   │   ├── unused-code-cleaner.md
-│   │   ├── code-cleaner.md
-│   │   ├── i18n-locale-translator.md
-│   │   ├── storybook-maintainer.md
-│   │   ├── idea-gardener.md
-│   │   ├── researcher.md
-│   │   ├── strategy-agent.md      # Core loop strategy
-│   │   ├── onboarding-agent.md    # UX onboarding
-│   │   └── user-guide-agent.md    # Feature documentation
-│   └── commands/       # User-invocable skills
+│   │   └── ... (12 more)
+│   └── commands/       # Explicit slash commands
 │       ├── push.md
-│       └── office.md   # Interactive strategy command
+│       └── office.md
 ├── _AUDIT/             # Living audit documents
 │   ├── FARMHOUSE.md    # Framework command center
-│   ├── SECURITY.md     # Security posture
-│   ├── PERFORMANCE.md  # Performance metrics
-│   ├── ACCESSIBILITY.md # WCAG 2.1 compliance
-│   ├── CODE_QUALITY.md # Code quality tracking
-│   ├── TESTS.md        # Test coverage
-│   ├── GARDEN.md       # Idea nursery (pre-plan stage)
-│   └── COMPOST.md      # Rejected ideas archive
-├── _OFFICE/            # Product strategy & UX docs
-│   ├── CORE_LOOP.md    # What/Stopping/Why strategy
-│   ├── ONBOARDING.md   # Tours, tooltips, modals
-│   └── USER_GUIDE.md   # Feature documentation
+│   ├── GARDEN.md       # Idea nursery
+│   ├── COMPOST.md      # Rejected ideas
+│   └── ... (security, performance, etc.)
+├── _OFFICE/            # Product strategy
+│   ├── GREENFIELD.md   # Vision
+│   ├── BROWNFIELD.md   # Reality
+│   └── ... (onboarding, user guide)
 ├── _PLANS/             # Implementation plans
-│   └── FEATURE_NAME.md
-├── _RESEARCH/          # Research documents (living docs)
-│   └── TOPIC_NAME.md
+├── _RESEARCH/          # Research documents
 ├── .beads/             # Issue tracking
 └── justfile            # Navigation commands
 ```
-
-<img src="/images/logo.png" alt="Farmwork - Developer Methodology" width="300" />
 
 ## Commands
 
@@ -191,30 +152,21 @@ If you enable Storybook (for React/Vue projects), the wizard will also ask for:
 - Password protection preference (recommended)
 
 **Creates:**
-- `CLAUDE.md` - Main instructions and phrase commands
+- `CLAUDE.md` - Lean instructions (references skills)
 - `.claude/` - Claude Code configuration directory
+  - `skills/` - 6 auto-activating workflows (farm-audit, farm-inspect, garden, research, production, market)
   - `agents/` - 15 specialized subagents
-  - `commands/` - 2 user-invocable skills (/push, /office)
+  - `commands/` - 2 slash commands (/push, /office)
+  - `settings.local.json` - Skill activation hook
 - `_AUDIT/` - Living audit documents
-  - `FARMHOUSE.md` - Framework command center
-  - `SECURITY.md` - Security posture tracking
-  - `PERFORMANCE.md` - Performance metrics
-  - `ACCESSIBILITY.md` - WCAG 2.1 compliance
-  - `CODE_QUALITY.md` - Code quality tracking
-  - `TESTS.md` - Test coverage tracking
-  - `GARDEN.md` - Idea nursery (pre-plan stage)
-  - `COMPOST.md` - Rejected ideas archive
-- `_OFFICE/` - Product strategy & UX documents
-  - `CORE_LOOP.md` - What/Stopping/Why strategy
-  - `ONBOARDING.md` - Tours, tooltips, modals
-  - `USER_GUIDE.md` - Feature documentation
+  - `FARMHOUSE.md`, `GARDEN.md`, `COMPOST.md`, and more
+- `_OFFICE/` - Product strategy documents
+  - `GREENFIELD.md`, `BROWNFIELD.md`, `ONBOARDING.md`, `USER_GUIDE.md`
 - `_PLANS/` - Implementation plans directory
 - `_RESEARCH/` - Research documents directory
 - `justfile` - Navigation and task commands
 
 ### `farmwork status`
-
-<img src="/images/status.png" alt="Farmwork Status" width="500" />
 
 Display Farmwork status and metrics.
 
@@ -230,11 +182,7 @@ farmwork status
 - Configuration file status
 - Project metrics (tests, stories)
 
-<img src="/images/status2.png" alt="Farmwork Status Details" width="500" />
-
 ### `farmwork doctor`
-
-<img src="/images/doctor.png" alt="Farmwork Doctor" width="500" />
 
 Check your Farmwork setup and diagnose issues.
 

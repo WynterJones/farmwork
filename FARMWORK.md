@@ -3,9 +3,9 @@
 > A reusable agentic development harness for AI-assisted software projects.
 > Turn any project into a well-organized, self-documenting, continuously improving codebase.
 
-**Version:** 1.3.0
+**Version:** 1.4.6
 **Author:** Wynter Jones
-**Website:** https://farmwork.wynter.ai
+**Website:** https://farmwork.dev
 
 ---
 
@@ -13,7 +13,8 @@
 
 Farmwork is an opinionated framework for organizing AI-assisted development workflows. It provides:
 
-- **Phrase Commands** - Natural language triggers for complex workflows
+- **Skills** - Auto-activating workflows that respond to natural phrases
+- **Slash Commands** - Explicit triggers for actions like `/push`
 - **Issue Tracking** - Beads CLI for lightweight, git-synced issues
 - **Living Audits** - Self-updating documentation that tracks project health
 - **Agentic Harness** - Specialized AI agents for code review, security, performance
@@ -21,10 +22,10 @@ Farmwork is an opinionated framework for organizing AI-assisted development work
 - **Quality Gates** - Automated lint, test, build pipelines
 
 The farming metaphor makes workflows memorable:
-- "open the farm" = audit your systems (update FARMHOUSE.md)
-- "count the herd" = full code inspection + dry run (no push)
-- "go to market" = i18n translations + accessibility audit
-- "close the farm" = push to production
+- "open the farm" = audit your systems (farm-audit skill)
+- "count the herd" = full code inspection (farm-inspect skill)
+- "go to market" = i18n + accessibility (market skill)
+- `/push` = commit and push to production
 
 ---
 
@@ -34,8 +35,7 @@ The farming metaphor makes workflows memorable:
 
 ```
 your-project/
-├── CLAUDE.md              # AI instructions + phrase commands
-├── FARMHOUSE.md           # Framework center (metrics, inventory, health)
+├── CLAUDE.md              # AI instructions (lean - references skills)
 ├── _AUDIT/                 # Living audit documents
 │   ├── FARMHOUSE.md        # Agentic harness metrics
 │   ├── SECURITY.md         # Security posture
@@ -47,12 +47,22 @@ your-project/
 │   └── COMPOST.md          # Rejected ideas archive
 ├── _PLANS/                 # Implementation plans (temporary)
 ├── _RESEARCH/              # Research documents (living docs)
-│   ├── FEATURE_NAME.md     # Research on a feature
-│   └── TECHNOLOGY.md       # Research on a technology
+├── _OFFICE/                # Product strategy documents
+│   ├── GREENFIELD.md       # Vision (where we want to go)
+│   ├── BROWNFIELD.md       # Reality (what's implemented)
+│   ├── ONBOARDING.md       # Onboarding documentation
+│   └── USER_GUIDE.md       # User documentation
 ├── .beads/                 # Issue tracking (auto-created by bd)
 ├── .claude/                # Claude Code configuration
-│   ├── commands/           # User-invocable skills (/command)
-│   ├── agents/             # Specialized subagents
+│   ├── skills/             # Auto-activating workflows (new!)
+│   │   ├── farm-audit/     # "open the farm"
+│   │   ├── farm-inspect/   # "count the herd"
+│   │   ├── garden/         # idea management
+│   │   ├── research/       # "let's research..."
+│   │   ├── production/     # "go to production"
+│   │   └── market/         # "go to market"
+│   ├── commands/           # Explicit slash commands (/push)
+│   └── agents/             # Specialized subagents (15+)
 └── justfile                # Navigation & task commands
 ```
 
@@ -65,53 +75,52 @@ your-project/
 | **Just** | Command runner | `brew install just` or `cargo install just` |
 | **Node.js** | Runtime | `nvm install 22` |
 
-### 3. Phrase Commands
+### 3. Skills (Auto-Activating Workflows)
 
-Farmwork defines three categories of phrase commands:
+Skills are Claude Code's auto-activating workflows. They respond to natural phrases and handle complex multi-step processes. Workflow details live in `.claude/skills/[skill-name]/SKILL.md`.
 
-#### Farmwork Phrases (Development Workflow)
+#### Development Skills
+| Phrase | Skill | What Happens |
+|--------|-------|--------------|
+| `open the farm` | farm-audit | Audit systems, update FARMHOUSE.md metrics |
+| `count the herd` | farm-inspect | Full code inspection (all audit agents, dry run) |
+| `go to market` | market | i18n scan + WCAG 2.1 accessibility audit |
+| `go to production` | production | Update BROWNFIELD, check strategy alignment |
+
+#### Idea Management (garden skill)
 | Phrase | Action |
 |--------|--------|
-| `open the farm` | Audit systems, update FARMHOUSE.md metrics |
-| `count the herd` | Full inspection + dry run: code review, cleanup, performance, security, code quality, accessibility |
-| `go to market` | i18n translation scan + accessibility audit |
-| `close the farm` | Push to production (lint, test, build, commit, push) |
-
-#### Plan Phrases
-| Phrase | Action |
-|--------|--------|
-| `make a plan for...` | Create plan in `_PLANS/` |
-| `let's implement...` | Load plan, create Epic + issues, start work |
-
-#### Idea Phrases (Pre-Plan Stage)
-| Phrase | Action |
-|--------|--------|
-| `I have an idea for...` | Add new idea to `_AUDIT/GARDEN.md` with planted date |
-| `let's plan this idea...` | Graduate idea from GARDEN → create plan in `_PLANS/` |
-| `I dont want to do this idea...` | Reject idea → move from GARDEN to COMPOST |
-| `remove this feature...` | Archive feature idea to COMPOST |
-| `compost this...` | Move idea from GARDEN to COMPOST |
-| `water the garden` | Generate 10 new ideas based on existing GARDEN and COMPOST |
+| `I have an idea for...` | Add new idea to `_AUDIT/GARDEN.md` |
+| `water the garden` | Generate 10 new ideas |
+| `compost this...` | Move idea to COMPOST.md |
+| `let's plan this idea...` | Graduate idea → create plan |
 
 **Idea Lifecycle:**
-- **Fresh** (0-44 days) - New ideas, ready to be developed
-- **Wilting** (45-60 days) - Ideas aging without action, marked with ⚠️
-- **Composted** (60+ days) - Auto-moved to COMPOST during "open the farm"
+- **Fresh** (0-44 days) - Ready to develop
+- **Wilting** (45-60 days) - Needs attention ⚠️
+- **Composted** (60+ days) - Auto-moved during audit
 
-#### Research Phrases (Pre-Plan Stage)
+#### Research (research skill)
 | Phrase | Action |
 |--------|--------|
-| `let's research...` | Create or update research document in `_RESEARCH/` |
-| `update research on...` | Refresh existing research with new findings |
-| `show research on...` | Display research summary and suggest refresh if stale |
+| `let's research...` | Create research doc in `_RESEARCH/` |
+| `update research on...` | Refresh with new findings |
 
-**Research Lifecycle:**
-- **Fresh** (0-14 days) - Research is current and reliable
-- **Aging** (15-30 days) - Consider refreshing for major decisions
-- **Stale** (30+ days) - Recommend updating before using for plans
+**Research Freshness:**
+- **Fresh** (0-14 days) - Current
+- **Aging** (15-30 days) - Consider refresh
+- **Stale** (30+ days) - Update before planning
 
-#### Project Phrases (Customizable)
-Add project-specific phrases as needed.
+### 4. Slash Commands (Explicit Actions)
+
+| Command | What It Does |
+|---------|--------------|
+| `/push` | Lint, test, build, commit, push |
+| `/office` | Interactive strategy setup |
+
+### 5. Skill Activation Hook
+
+Farmwork adds a `UserPromptSubmit` hook that reminds Claude to check for applicable skills on each message. This improves activation reliability.
 
 ---
 
@@ -856,6 +865,21 @@ bd sync
 ---
 
 ## Changelog
+
+### 1.4.6 (2025-12-29)
+- **Major Architecture Change**: Migrated from phrase commands to **Skills**
+- Added **6 Skills** in `.claude/skills/`:
+  - `farm-audit` - "open the farm" workflow
+  - `farm-inspect` - "count the herd" full inspection
+  - `garden` - idea management (plant, water, compost)
+  - `research` - systematic research
+  - `production` - "go to production" readiness check
+  - `market` - "go to market" i18n + accessibility
+- Added **UserPromptSubmit hook** for reliable skill activation
+- **Simplified CLAUDE.md** from ~340 lines to ~75 lines
+- Skills auto-activate on natural phrases (same UX, better reliability)
+- Workflow details moved from CLAUDE.md to individual SKILL.md files
+- Skills support progressive disclosure (supporting files loaded on demand)
 
 ### 1.3.0 (2024-12-27)
 - Added **Research Phase** - systematic research before planning with `_RESEARCH/` folder

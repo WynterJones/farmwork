@@ -273,6 +273,7 @@ export async function init(options) {
           await fs.ensureDir(path.join(cwd, "_OFFICE"));
           await fs.ensureDir(path.join(cwd, ".claude", "commands"));
           await fs.ensureDir(path.join(cwd, ".claude", "agents"));
+          await fs.ensureDir(path.join(cwd, ".claude", "skills"));
         },
       },
       { name: "Planting CLAUDE.md", fn: () => createClaudeMd(cwd, answers) },
@@ -291,6 +292,7 @@ export async function init(options) {
       },
       { name: "Laying out justfile", fn: () => createJustfile(cwd, answers) },
       { name: "Training agents", fn: () => createAgents(cwd, answers) },
+      { name: "Cultivating skills", fn: () => createSkills(cwd, answers) },
       { name: "Setting up commands", fn: () => createCommands(cwd, answers) },
       { name: "Configuring settings", fn: () => createSettings(cwd, answers) },
       {
@@ -466,334 +468,73 @@ async function createClaudeMd(cwd, answers) {
 
 **ALWAYS create beads issues BEFORE starting work.** This ensures full visibility and tracking.
 
-### Single Task
-1. Create issue: \`bd create "Task description" -t bug|feature|task -p 0-4\`
-2. Claim it: \`bd update <id> --status in_progress\`
-3. Do the work
-4. Close it: \`bd close <id> --reason "What was done"\`
+\`\`\`bash
+# Single task
+bd create "Task description" -t bug|feature|task -p 0-4
+bd update <id> --status in_progress
+# Do the work
+bd close <id> --reason "What was done"
 
-### Multiple Tasks
-When given multiple tasks, **log ALL of them first** before starting:
-1. Create all issues upfront
-2. Show what's queued: \`bd list --status open\`
-3. Work through them one by one
-4. Close each issue when complete
+# Multiple tasks - log ALL first, then work through
+bd create "Task 1" -t feature && bd create "Task 2" -t task
+bd list --status open
+\`\`\`
 
 **NO EXCEPTIONS**: Every task gets an issue.
 
 ---
 
-## Phrase Commands
+## Skills (Auto-Activate on Phrases)
 
-These are phrase triggers. Most activate when the phrase is the **entire message**.
+Skills auto-activate when you use these phrases. Workflow details are in \`.claude/skills/\`.
 
----
-
-### Farmwork Phrases (Development Workflow)
-
-Run these in order for a complete development cycle:
-
-| Phrase | Action |
-|--------|--------|
-| **open the farm** | Audit systems, update \`_AUDIT/FARMHOUSE.md\` with current metrics |
-| **count the herd** | Full inspection + dry run: code review, cleanup, performance, security, code quality, accessibility |
-| **go to market** | i18n scan + accessibility audit for missing translations and a11y issues |
-| **close the farm** | Execute \`/push\` (lint, test, build, commit, push) |
+| Phrase | Skill | What Happens |
+|--------|-------|--------------|
+| **open the farm** | farm-audit | Audit systems, update FARMHOUSE.md |
+| **count the herd** | farm-inspect | Full code inspection (no push) |
+| **go to market** | market | i18n + accessibility audit |
+| **go to production** | production | BROWNFIELD update, strategy check |
+| **I have an idea for...** | garden | Plant idea in GARDEN.md |
+| **water the garden** | garden | Generate 10 new ideas |
+| **compost this...** | garden | Move idea to COMPOST.md |
+| **let's research...** | research | Create/update _RESEARCH/ doc |
 
 ---
 
-### Plan Phrases
+## Slash Commands (Explicit)
 
-| Phrase | Action |
-|--------|--------|
-| **make a plan for...** | Investigate codebase, create plan, save to \`_PLANS/*.md\` |
-| **let's implement...** | Load plan from \`_PLANS/*.md\`, create Epic + issues, confirm, start work |
-
----
-
-### Idea Phrases (Pre-Plan Stage)
-
-| Phrase | Action |
-|--------|--------|
-| **I have an idea for...** | Add new idea to \`_AUDIT/GARDEN.md\` (title, description, bullets) |
-| **let's plan this idea...** | Graduate idea from GARDEN → create plan in \`_PLANS/\` |
-| **I dont want to do this idea...** | Reject idea → move from GARDEN to COMPOST |
-| **remove this feature...** | Archive feature idea to COMPOST |
-| **compost this...** | Move idea from GARDEN to COMPOST |
-| **water the garden** | Generate 10 new ideas based on existing GARDEN and COMPOST |
-
----
-
-### Research Phrases (Pre-Plan Stage)
-
-| Phrase | Action |
-|--------|--------|
-| **let's research...** | Create or update research document in \`_RESEARCH/\` |
-| **update research on...** | Update existing research document with fresh findings |
-| **show research on...** | Display summary of existing research document |
-
----
-
-### Office Phrases (Product Strategy & UX)
-
-| Phrase | Action |
-|--------|--------|
-| **setup office** | Interactive guided setup: GREENFIELD vision, strategy, optional ONBOARDING and USER_GUIDE |
-| **go to production** | Production check: update BROWNFIELD.md, check GREENFIELD alignment, note doc impacts |
-
----
-
-### Farmwork Phrase Details
-
-**open the farm**
-1. Launch \`the-farmer\` agent to audit all systems
-2. Run \`bd list --status closed | wc -l\` to get total completed issues
-3. Updates \`_AUDIT/FARMHOUSE.md\` with current metrics
-
-**count the herd** (Full Audit Cycle)
-Runs all inspection agents in parallel, then dry run quality gates. No push.
-
-1. **Code Quality** - \`code-quality\` for review + smells, updates \`_AUDIT/CODE_QUALITY.md\`
-2. **Code Cleanup** - \`code-cleaner\` for dead code + comments
-3. **Performance Audit** - \`performance-auditor\`, updates \`_AUDIT/PERFORMANCE.md\`
-4. **Security Audit** - \`security-auditor\` for OWASP Top 10, updates \`_AUDIT/SECURITY.md\`
-5. **Accessibility** - \`accessibility-auditor\` for WCAG 2.1, updates \`_AUDIT/ACCESSIBILITY.md\`
-6. **Dry Run** - lint, tests, build (but NOT commit/push)
-7. **Summary Report** - Consolidate findings, ask user next steps
-
-**go to market**
-1. Scan for hardcoded text not using i18n
-2. Launch \`i18n-locale-translator\` agent
-3. Launch \`accessibility-auditor\` for WCAG 2.1 compliance
-4. Updates \`_AUDIT/ACCESSIBILITY.md\`
-
-**close the farm**
-- Invoke the \`push\` skill immediately
-
----
-
-### Idea Phrase Details
-
-**I have an idea for...**
-1. Launch \`idea-gardener\` agent
-2. Parse idea title from user input
-3. Ask for short description and bullet points
-4. Add to \`_AUDIT/GARDEN.md\` under ## Ideas section
-
-**let's plan this idea...**
-1. Launch \`idea-gardener\` agent
-2. Find the idea in GARDEN.md
-3. Create plan in \`_PLANS/\` using plan mode
-4. Move to "Graduated to Plans" table
-5. Remove from ## Ideas section
-
-**compost this...** / **I dont want to do this idea...**
-1. Launch \`idea-gardener\` agent
-2. Find idea in GARDEN.md (or accept new rejection)
-3. Ask for rejection reason
-4. Add to \`_AUDIT/COMPOST.md\` with reason
-5. Remove from GARDEN.md if it was there
-
-**water the garden**
-1. Launch \`idea-gardener\` agent
-2. Read \`_AUDIT/GARDEN.md\` to understand existing ideas and themes
-3. Read \`_AUDIT/COMPOST.md\` to understand what didn't work and why
-4. Generate 10 new, creative ideas that:
-   - Build on or extend existing garden ideas
-   - Avoid patterns that led to composted ideas
-   - Consider the project's direction and goals
-5. Present ideas as a numbered list with title and one-line description
-6. Ask user: "Which ideas would you like to plant? (enter numbers, e.g., 1, 3, 5)"
-7. For selected ideas, add each to GARDEN.md with today's planted date
-
----
-
-### Research Phrase Details
-
-**let's research...**
-1. Launch \`researcher\` agent
-2. Parse research topic from user input
-3. Check for existing research in \`_RESEARCH/\`
-4. Spawn parallel subagents for:
-   - Documentation finder (official docs, API refs)
-   - Security researcher (CVEs, known issues)
-   - Tech stack analyzer (dependencies, compatibility)
-   - Community researcher (gotchas, discussions)
-5. If ref.tools MCP available: Use \`mcp__Ref__ref_search_documentation\` for docs lookup
-6. Consolidate findings into \`_RESEARCH/[TOPIC_NAME].md\`
-7. Display summary and suggest next steps
-
-**update research on...**
-1. Launch \`researcher\` agent
-2. Find existing research document in \`_RESEARCH/\`
-3. Run targeted research refresh on specified areas
-4. Merge new findings, mark outdated info with strikethrough
-5. Update research history and Last Researched date
-
-**show research on...**
-1. Find research document in \`_RESEARCH/\`
-2. Display summary of key findings, risks, confidence level
-3. Suggest refresh if research is aging (15+ days) or stale (30+ days)
-
----
-
-### Office Phrase Details
-
-**setup office**
-
-Interactive guided setup experience for the _OFFICE/ documents.
-
-1. **Welcome & Context**
-   - Display: "Let's set up your product office. I'll guide you through defining your vision and documentation."
-   - Check if _OFFICE/ files already exist
-   - If existing files found, ask: "Office files already exist. Would you like to update them or start fresh?"
-
-2. **GREENFIELD.md Setup (Required)**
-   - Spawn \`strategy-agent\` for interactive setup
-   - Ask questions in sequence:
-     a. "What's your project name?" (pre-fill from .farmwork.json if available)
-     b. "In one sentence, what is this product?"
-     c. "What problem does it solve for users?"
-     d. "What's the main thing users DO in your app?" (Core action)
-     e. "What's stopping users from succeeding?" (Blockers)
-     f. "What motivates users to keep using it?" (Motivation)
-   - Save answers to GREENFIELD.md
-   - Report: "Vision documented in GREENFIELD.md"
-
-3. **Strategy Refinement (Optional)**
-   - Ask: "Would you like to define strategic pillars? (y/n)"
-   - If yes, ask for 2-3 key principles that guide decisions
-   - Add to GREENFIELD.md Strategic Pillars section
-
-4. **ONBOARDING.md Setup (Optional)**
-   - Ask: "Does your app have onboarding elements to document? (y/n)"
-   - If yes, spawn \`onboarding-agent\` to:
-     a. Scan codebase for existing onboarding elements
-     b. Ask about welcome experience
-     c. Ask about guided tours or tooltips
-     d. Document findings in ONBOARDING.md
-   - If no, keep placeholder ONBOARDING.md
-
-5. **USER_GUIDE.md Setup (Optional)**
-   - Ask: "Would you like to set up user documentation now? (y/n)"
-   - If yes, spawn \`user-guide-agent\` to:
-     a. Scan codebase for features
-     b. Ask about main features to document
-     c. Create Quick Start section
-     d. Document features in USER_GUIDE.md
-   - If no, keep placeholder USER_GUIDE.md
-
-6. **Summary Report**
-   \`\`\`
-   ## Office Setup Complete
-
-   ### Documents Created/Updated
-   - GREENFIELD.md: [Complete/Updated]
-   - BROWNFIELD.md: [Created - will populate on "go to production"]
-   - ONBOARDING.md: [Complete/Skipped]
-   - USER_GUIDE.md: [Complete/Skipped]
-
-   ### Next Steps
-   - Use "go to production" to update BROWNFIELD.md with implemented features
-   - Run /push to commit your office documents
-   \`\`\`
-
----
-
-**go to production**
-
-Production readiness check from a user experience perspective. Separate from "close the farm" (which handles code quality/push).
-
-1. **Update BROWNFIELD.md**
-   - Spawn \`brownfield-agent\` to scan for implemented features
-   - Document any new features added since last production
-   - Document any features removed
-   - Update Production History table
-   - Update Last Updated date
-
-2. **Check for Document Impacts**
-   - Scan changes against USER_GUIDE.md
-   - List any features that need USER_GUIDE updates
-   - Scan changes against ONBOARDING.md
-   - List any onboarding elements that need updates
-
-3. **Check GREENFIELD Alignment**
-   - Spawn \`strategy-agent\` to compare BROWNFIELD against GREENFIELD
-   - Ask user: "Do you see any misalignment between your vision (GREENFIELD) and what's implemented (BROWNFIELD)?"
-   - If misalignment reported, add to Strategy Changelog
-
-4. **Generate Production Readiness Report**
-   \`\`\`
-   ## Production Readiness: Implementation Check
-
-   ### BROWNFIELD Status
-   - Last Updated: YYYY-MM-DD
-   - New Features: X added
-   - Removed Features: X removed
-   - Modified Features: X changed
-
-   ### Documentation Impact
-   - USER_GUIDE.md needs updates: [list or "None"]
-   - ONBOARDING.md needs updates: [list or "None"]
-
-   ### Strategy Alignment
-   - GREENFIELD vision: [summary]
-   - BROWNFIELD reality: [summary]
-   - Alignment: High/Medium/Low
-
-   ### Recommendation
-   [Ready for production / Needs attention: ...]
-   \`\`\`
-
-5. **Ask for Confirmation**
-   - "Production check complete. Ready to proceed with deployment?"
-   - Wait for user confirmation before any further action
-
-**Note:** This phrase focuses on implementation status and alignment. Use "close the farm" for code quality gates and pushing to remote.
+| Command | What It Does |
+|---------|--------------|
+| \`/push\` | Lint, test, build, commit, push |
+| \`/office\` | Interactive strategy setup |
 
 ---
 
 ## Plan Mode Protocol
 
-**CRITICAL**: When Claude enters Plan Mode, ALL plans MUST:
+When entering Plan Mode:
 
-### Step 1: Save Plan to \`_PLANS/\`
-Before exiting plan mode, the plan MUST be saved to \`_PLANS/<FEATURE_NAME>.md\`:
-- Use SCREAMING_SNAKE_CASE for filename
-- Include: overview, technical approach, files to modify, implementation steps, risks
-
-### Step 2: Exit Plan Mode & Create Epic
-After user approves:
-1. Exit plan mode
-2. Create a beads Epic
-3. Create child issues from plan steps
-
-### Step 3: Confirm Before Implementation
-1. Show the created Epic and issues
-2. **Always ask**: "Ready to start implementing?"
-3. Wait for explicit user confirmation
+1. **Save Plan**: Write to \`_PLANS/<FEATURE_NAME>.md\` (SCREAMING_SNAKE_CASE)
+2. **Exit & Create Epic**: Create beads Epic + child issues
+3. **Confirm**: Ask "Ready to start implementing?" - wait for explicit yes
 
 ---
 
 ## Project Configuration
 
-- **Test Command:** \`${answers.testCommand}\`
-- **Build Command:** \`${answers.buildCommand}\`
-- **Lint Command:** \`${answers.lintCommand}\`
+- **Test:** \`${answers.testCommand}\`
+- **Build:** \`${answers.buildCommand}\`
+- **Lint:** \`${answers.lintCommand}\`
 
 ---
 
-## Tips for Claude Code
+## Quick Reference
 
-### When Working on Features
-- Always check justfile: \`just --list\`
-- Create issues before starting work
-- Use "make a plan for..." for non-trivial features
-
-### Before Committing
 \`\`\`bash
-${answers.lintCommand}    # Check code quality
-${answers.buildCommand}   # Verify compilation
+just --list        # See all commands
+bd list            # See all issues
+ls .claude/skills  # See available skills
+ls .claude/agents  # See available agents
 \`\`\`
 `;
 
@@ -2744,6 +2485,684 @@ Updated _OFFICE/USER_GUIDE.md
   }
 }
 
+async function createSkills(cwd, answers) {
+  // Skills are directories with SKILL.md files
+  // They auto-activate based on semantic matching of the description field
+
+  const skills = {
+    "farm-audit": {
+      "SKILL.md": `---
+name: farm-audit
+description: Audit all Farmwork systems and update FARMHOUSE.md metrics. Use when user says "open the farm", "audit systems", "check farm status", "update farmhouse", "project health", or asks about the current state of the project.
+allowed-tools: Bash(*), Task, Read, Edit, Glob, Grep
+---
+
+# Farm Audit Skill
+
+Comprehensive audit of all Farmwork systems. Updates \`_AUDIT/FARMHOUSE.md\` with current metrics.
+
+## When to Use
+- User wants to check project health
+- Starting a new work session
+- Before major releases
+- Periodic maintenance check
+
+## Workflow
+
+### Step 1: Launch the-farmer Agent
+Spawn the \`the-farmer\` agent to gather all metrics.
+
+### Step 2: Gather Metrics
+1. Count commands: \`ls -1 .claude/commands/*.md 2>/dev/null | wc -l\`
+2. Count agents: \`ls -1 .claude/agents/*.md 2>/dev/null | wc -l\`
+3. Count skills: \`ls -d .claude/skills/*/ 2>/dev/null | wc -l\`
+4. Count tests: \`find . -name "*.test.*" -not -path "./node_modules/*" | wc -l\`
+5. Count completed issues: \`bd list --status closed 2>/dev/null | wc -l\`
+
+### Step 3: Tend the Idea Garden
+Read \`_AUDIT/GARDEN.md\` and check idea ages:
+- **Fresh** (0-44 days): No action needed
+- **Wilting** (45-60 days): Mark with ⚠️ in output
+- **Composted** (60+ days): Move to \`_AUDIT/COMPOST.md\`
+
+### Step 4: Check Research Freshness
+Read \`_RESEARCH/*.md\` files and check ages:
+- **Fresh** (0-14 days): Current and reliable
+- **Aging** (15-30 days): Consider refreshing
+- **Stale** (30+ days): Recommend update
+
+### Step 5: Update FARMHOUSE.md
+Update \`_AUDIT/FARMHOUSE.md\` with:
+- Current date
+- All metrics
+- Score based on completeness
+- Audit history entry
+
+## Output Format
+\`\`\`
+## Farm Audit Complete
+
+### Metrics
+- Commands: X
+- Agents: X
+- Skills: X
+- Tests: X files
+- Completed Issues: X
+
+### Idea Garden
+- Active: X ideas
+- Wilting: X ideas (list if any)
+- Auto-composted: X ideas
+
+### Research Library
+- Fresh: X docs
+- Aging: X docs
+- Stale: X docs
+
+### Score: X/10
+\`\`\`
+`,
+      "checklist.md": `# Farm Audit Checklist
+
+## Pre-Audit
+- [ ] Ensure all files are saved
+- [ ] Check git status is clean (optional)
+
+## Audit Items
+- [ ] Commands inventory
+- [ ] Agents inventory
+- [ ] Skills inventory
+- [ ] Test file count
+- [ ] Completed issues count
+- [ ] Idea garden tending
+- [ ] Research freshness check
+
+## Post-Audit
+- [ ] FARMHOUSE.md updated
+- [ ] Score calculated
+- [ ] Audit history entry added
+`
+    },
+
+    "farm-inspect": {
+      "SKILL.md": `---
+name: farm-inspect
+description: Run full code inspection with all audit agents in parallel. Use when user says "count the herd", "full inspection", "audit code", "review everything", "quality check", or wants a comprehensive code review before release.
+allowed-tools: Bash(*), Task, Read, Edit, Glob, Grep
+---
+
+# Farm Inspect Skill
+
+Full code inspection using all audit agents. Runs quality gates but does NOT push.
+
+## When to Use
+- Before releases
+- After major changes
+- Quality gate checks
+- Comprehensive code review
+
+## Workflow
+
+### Step 1: Run Audit Agents (Parallel)
+Launch these agents in parallel using the Task tool:
+
+1. **code-quality** - Code review + smell detection
+   - Updates \`_AUDIT/CODE_QUALITY.md\`
+
+2. **security-auditor** - OWASP Top 10 scanning
+   - Updates \`_AUDIT/SECURITY.md\`
+
+3. **performance-auditor** - Performance anti-patterns
+   - Updates \`_AUDIT/PERFORMANCE.md\`
+
+4. **accessibility-auditor** - WCAG 2.1 compliance
+   - Updates \`_AUDIT/ACCESSIBILITY.md\`
+
+5. **code-cleaner** - Dead code + comment detection
+   - Reports what would be cleaned (dry run)
+
+### Step 2: Dry Run Quality Gates
+Run these commands but do NOT commit or push:
+
+1. **Lint**: Run the configured lint command
+2. **Test**: Run the configured test command
+3. **Build**: Run the configured build command
+
+### Step 3: Generate Summary Report
+Consolidate all findings:
+- Critical issues (must fix)
+- High priority issues
+- Medium priority issues
+- Low priority suggestions
+
+## Output Format
+\`\`\`
+## Full Inspection Complete
+
+### Code Quality
+Score: X/10
+Issues: X critical, X high, X medium
+
+### Security
+Score: X/10
+Vulnerabilities: X found
+
+### Performance
+Score: X/10
+Anti-patterns: X found
+
+### Accessibility
+Score: X/10
+WCAG issues: X found
+
+### Quality Gates
+- Lint: ✓/✗
+- Tests: ✓/✗
+- Build: ✓/✗
+
+### Next Steps
+[List of recommended actions]
+\`\`\`
+
+## Important
+This skill does NOT push changes. Use \`/push\` when ready to commit and push.
+`,
+      "audit-agents.md": `# Audit Agents Reference
+
+## code-quality
+Reviews code for DRY violations, complexity, naming issues, and best practices.
+
+## security-auditor
+Scans for OWASP Top 10 vulnerabilities including XSS, injection, and auth issues.
+
+## performance-auditor
+Finds memory leaks, unnecessary re-renders, and performance anti-patterns.
+
+## accessibility-auditor
+Checks WCAG 2.1 Level AA compliance including alt text, contrast, and keyboard nav.
+
+## code-cleaner
+Detects dead code, unused imports, comments, and console.logs.
+`
+    },
+
+    "garden": {
+      "SKILL.md": `---
+name: garden
+description: Manage the Idea Garden - plant new ideas, water the garden for fresh ideas, compost rejected ones. Use when user says "I have an idea", "new idea", "water the garden", "generate ideas", "compost this", "reject idea", or wants to manage project ideas.
+allowed-tools: Read, Edit, Glob, Grep, Task
+---
+
+# Idea Garden Skill
+
+Manages \`_AUDIT/GARDEN.md\` and \`_AUDIT/COMPOST.md\` for idea lifecycle tracking.
+
+## Actions
+
+### Plant an Idea
+**Triggers:** "I have an idea for...", "new idea", "add idea"
+
+1. Parse idea title from user input
+2. Ask for:
+   - Short description (1-2 sentences)
+   - Key bullet points (2-4 items)
+3. Add to \`_AUDIT/GARDEN.md\` under ## Ideas:
+   \`\`\`markdown
+   ### [Idea Title]
+   **Planted:** YYYY-MM-DD
+   [Short description]
+   - Bullet point 1
+   - Bullet point 2
+   \`\`\`
+4. Update "Active Ideas" count in header
+5. Update "Last Updated" date
+
+### Water the Garden
+**Triggers:** "water the garden", "generate ideas", "brainstorm"
+
+1. Read \`_AUDIT/GARDEN.md\` to understand existing ideas
+2. Read \`_AUDIT/COMPOST.md\` to understand rejected patterns
+3. Generate 10 new ideas that:
+   - Extend or complement existing ideas
+   - Avoid patterns that led to rejection
+   - Align with project goals
+4. Present as numbered list:
+   \`\`\`
+   ## Fresh Ideas
+   1. **[Title]** - One-line description
+   2. **[Title]** - One-line description
+   ...
+
+   Which ideas would you like to plant? (e.g., 1, 3, 5)
+   \`\`\`
+5. Plant selected ideas with today's date
+
+### Compost an Idea
+**Triggers:** "compost this", "reject idea", "don't want this idea", "remove this"
+
+1. Find idea in GARDEN.md (or accept direct rejection)
+2. Ask for rejection reason
+3. Add to \`_AUDIT/COMPOST.md\`:
+   \`\`\`markdown
+   ### [Idea Title]
+   **Composted:** YYYY-MM-DD
+   **Reason:** [User's reason]
+   [Original description if available]
+   \`\`\`
+4. Remove from GARDEN.md if present
+5. Update counts in both files
+
+### Graduate an Idea to Plan
+**Triggers:** "let's plan this idea", "graduate idea"
+
+1. Find idea in GARDEN.md
+2. Enter Plan Mode to create plan in \`_PLANS/\`
+3. Move idea to "Graduated to Plans" table
+4. Remove from ## Ideas section
+
+## Idea Lifecycle
+- **Fresh** (0-44 days): Ready for development
+- **Wilting** (45-60 days): Needs attention, marked ⚠️
+- **Composted** (60+ days): Auto-moved during farm audit
+`,
+      "idea-templates.md": `# Idea Templates
+
+## New Idea Format
+\`\`\`markdown
+### [Idea Title]
+**Planted:** YYYY-MM-DD
+[1-2 sentence description of the idea]
+- Key aspect or requirement 1
+- Key aspect or requirement 2
+- Potential challenge or consideration
+\`\`\`
+
+## Composted Idea Format
+\`\`\`markdown
+### [Idea Title]
+**Composted:** YYYY-MM-DD
+**Reason:** [Why this was rejected]
+[Original description]
+\`\`\`
+
+## Graduated Idea Table Row
+\`\`\`markdown
+| [Idea Title] | [PLAN_NAME.md](../_PLANS/PLAN_NAME.md) | YYYY-MM-DD |
+\`\`\`
+`
+    },
+
+    "research": {
+      "SKILL.md": `---
+name: research
+description: Systematic research before planning - gather documentation, security concerns, tech stack analysis, and community insights. Use when user says "let's research", "research this", "investigate", "look into", or needs to understand a technology or feature before planning.
+allowed-tools: Read, Edit, Glob, Grep, Task, WebFetch, WebSearch
+---
+
+# Research Skill
+
+Conducts systematic research and creates living documents in \`_RESEARCH/\`.
+
+## When to Use
+- Before planning new features
+- Evaluating technologies
+- Security research
+- Understanding dependencies
+
+## Workflow
+
+### Step 1: Parse Research Topic
+1. Extract topic from user input
+2. Normalize to SCREAMING_SNAKE_CASE for filename
+3. Check if \`_RESEARCH/[TOPIC].md\` already exists
+
+### Step 2: Spawn Parallel Research Tasks
+Use Task tool to run these in parallel:
+
+**Documentation Research:**
+- Find official documentation
+- Identify API references
+- Locate getting started guides
+- Check for migration guides
+
+**Security Research:**
+- Search for known CVEs
+- Find security advisories
+- Identify auth/authz concerns
+- Check dependency vulnerabilities
+
+**Tech Stack Analysis:**
+- Identify required dependencies
+- Check Node.js/browser compatibility
+- Analyze bundle size implications
+- Find TypeScript definitions
+
+**Community Research:**
+- Search GitHub issues for common problems
+- Find Stack Overflow discussions
+- Identify known gotchas
+- Gather performance tips
+
+### Step 3: Consolidate Findings
+1. Merge findings into structured document
+2. Identify conflicts between sources
+3. Assign confidence levels
+4. Highlight critical risks
+
+### Step 4: Create/Update Research Document
+Save to \`_RESEARCH/[TOPIC].md\` using the template format.
+
+## Research Freshness
+- **Fresh** (0-14 days): Current and reliable
+- **Aging** (15-30 days): Consider refreshing for major decisions
+- **Stale** (30+ days): Update before using in plans
+
+## Output Format
+\`\`\`
+## Research Complete: [Topic]
+
+### Key Findings
+- Finding 1
+- Finding 2
+- Finding 3
+
+### Critical Risks
+- Risk 1 (if any)
+- Risk 2 (if any)
+
+### Confidence: High/Medium/Low
+
+Document saved: _RESEARCH/[TOPIC].md
+
+Next steps:
+- Review full research document
+- "make a plan for..." to create implementation plan
+- "update research on..." to gather more information
+\`\`\`
+`,
+      "research-template.md": `# Research Document Template
+
+\`\`\`markdown
+# Research: [Topic Name]
+
+> Systematic research findings for informed decision-making.
+
+**Created:** YYYY-MM-DD
+**Last Researched:** YYYY-MM-DD
+**Status:** Fresh | Aging | Stale
+**Confidence:** High | Medium | Low
+
+---
+
+## Summary
+[2-3 sentence executive summary]
+
+---
+
+## Official Documentation
+
+| Resource | URL | Notes |
+|----------|-----|-------|
+| [Name] | [URL] | [Key insight] |
+
+---
+
+## Tech Stack Analysis
+
+### Dependencies
+- **package-name** - vX.X.X - [purpose]
+
+### Compatibility
+| Environment | Status | Notes |
+|-------------|--------|-------|
+| Node.js | vX.X+ | |
+| Browser | [support] | |
+
+---
+
+## Security Concerns
+
+### Known Vulnerabilities
+| CVE/Issue | Severity | Status | Mitigation |
+|-----------|----------|--------|------------|
+| [ID] | High/Med/Low | Fixed/Open | [action] |
+
+### Best Practices
+- Practice 1
+- Practice 2
+
+---
+
+## Risks & Gotchas
+
+### Common Pitfalls
+1. **[Name]** - Description and avoidance
+
+### Edge Cases
+- Case 1
+- Case 2
+
+---
+
+## Implementation Recommendations
+
+### Recommended Approach
+[Based on research...]
+
+### Alternatives
+| Approach | Pros | Cons |
+|----------|------|------|
+| [Alt] | [pros] | [cons] |
+
+---
+
+## Research History
+
+| Date | Areas Updated |
+|------|---------------|
+| YYYY-MM-DD | Initial research |
+\`\`\`
+`
+    },
+
+    "production": {
+      "SKILL.md": `---
+name: production
+description: Production readiness check from UX perspective - update BROWNFIELD.md with implemented features, check GREENFIELD alignment, note documentation impacts. Use when user says "go to production", "production check", "ready to ship", "pre-release check", or wants to verify implementation status before deployment.
+allowed-tools: Read, Edit, Glob, Grep, Task
+---
+
+# Production Skill
+
+Production readiness check focusing on implementation status and strategy alignment.
+
+## When to Use
+- Before production deployment
+- Feature completion verification
+- Strategy alignment check
+- Documentation impact assessment
+
+## Workflow
+
+### Step 1: Update BROWNFIELD.md
+Scan codebase and update \`_OFFICE/BROWNFIELD.md\`:
+
+1. Identify implemented features:
+   - Check routes and pages
+   - Find feature directories
+   - Look for user-facing components
+
+2. Compare against last production snapshot
+
+3. Document changes:
+   - **Added:** New features since last production
+   - **Removed:** Features that were removed
+   - **Modified:** Significant changes
+
+4. Update Production History table
+
+### Step 2: Check Documentation Impacts
+Scan changes against documentation:
+
+**USER_GUIDE.md:**
+- List features needing documentation updates
+- Identify new features without docs
+
+**ONBOARDING.md:**
+- Check if onboarding elements need updates
+- Identify new flows without guidance
+
+### Step 3: Check GREENFIELD Alignment
+Compare vision against implementation:
+
+1. Read \`_OFFICE/GREENFIELD.md\` (vision)
+2. Read \`_OFFICE/BROWNFIELD.md\` (reality)
+3. Assess alignment: High / Medium / Low
+4. Ask user about any perceived misalignment
+5. Document strategy changes if needed
+
+### Step 4: Generate Readiness Report
+
+\`\`\`
+## Production Readiness: Implementation Check
+
+### BROWNFIELD Status
+- Last Updated: YYYY-MM-DD
+- New Features: X added
+- Removed Features: X removed
+- Modified Features: X changed
+
+### Documentation Impact
+- USER_GUIDE.md needs updates: [list or "None"]
+- ONBOARDING.md needs updates: [list or "None"]
+
+### Strategy Alignment
+- GREENFIELD vision: [summary]
+- BROWNFIELD reality: [summary]
+- Alignment: High/Medium/Low
+
+### Recommendation
+[Ready for production / Needs attention: ...]
+\`\`\`
+
+### Step 5: Confirm with User
+Ask: "Production check complete. Ready to proceed with deployment?"
+Wait for explicit confirmation.
+
+## Important
+This skill checks implementation status. Use \`/push\` for code quality gates and pushing to remote.
+`,
+      "checklist.md": `# Production Readiness Checklist
+
+## Implementation Status
+- [ ] All planned features implemented
+- [ ] Removed features documented
+- [ ] BROWNFIELD.md updated
+
+## Documentation
+- [ ] USER_GUIDE.md current
+- [ ] ONBOARDING.md current
+- [ ] New features documented
+
+## Strategy Alignment
+- [ ] GREENFIELD vision reviewed
+- [ ] Implementation matches vision
+- [ ] Any pivots documented
+
+## Quality (handled by /push)
+- [ ] Lint passing
+- [ ] Tests passing
+- [ ] Build succeeds
+`
+    },
+
+    "market": {
+      "SKILL.md": `---
+name: market
+description: Internationalization and accessibility audit - scan for hardcoded text, check i18n coverage, run WCAG 2.1 accessibility audit. Use when user says "go to market", "i18n check", "accessibility audit", "translation check", or wants to prepare app for international users.
+allowed-tools: Read, Edit, Glob, Grep, Task
+---
+
+# Market Skill
+
+Prepare the application for international markets with i18n and accessibility checks.
+
+## When to Use
+- Preparing for international launch
+- Adding new language support
+- Accessibility compliance check
+- Before major releases
+
+## Workflow
+
+### Step 1: i18n Scan
+1. Search for hardcoded text in components:
+   - JSX text content
+   - Placeholder attributes
+   - Title attributes
+   - Alt text (check if translatable)
+
+2. Check for i18n usage patterns:
+   - \`t()\` or \`useTranslation\` hooks
+   - Translation file coverage
+   - Missing translation keys
+
+3. Report hardcoded strings that need i18n
+
+### Step 2: Launch i18n Translator Agent
+Spawn \`i18n-locale-translator\` agent to:
+- Extract hardcoded text
+- Create translation keys
+- Generate locale files (en, jp, etc.)
+- Update components with translation hooks
+
+### Step 3: Accessibility Audit
+Launch \`accessibility-auditor\` agent for WCAG 2.1 Level AA:
+- Alt text on images
+- Color contrast ratios
+- Keyboard navigation
+- ARIA labels and roles
+- Form accessibility
+- Focus management
+
+### Step 4: Update Audit Documents
+Update \`_AUDIT/ACCESSIBILITY.md\` with findings.
+
+## Output Format
+\`\`\`
+## Market Readiness Check
+
+### i18n Status
+- Hardcoded strings found: X
+- Translation coverage: X%
+- Missing translations: [list]
+
+### Accessibility (WCAG 2.1 AA)
+Score: X/10
+- Critical issues: X
+- High priority: X
+- Medium priority: X
+
+### Recommendations
+- [Action items]
+
+Updated: _AUDIT/ACCESSIBILITY.md
+\`\`\`
+`
+    }
+  };
+
+  // Create each skill directory and files
+  for (const [skillName, files] of Object.entries(skills)) {
+    const skillDir = path.join(cwd, ".claude", "skills", skillName);
+    await fs.ensureDir(skillDir);
+
+    for (const [filename, content] of Object.entries(files)) {
+      await fs.writeFile(path.join(skillDir, filename), content);
+    }
+  }
+}
+
 async function createCommands(cwd, answers) {
   const pm = answers.packageManager || "npm";
 
@@ -2861,7 +3280,33 @@ Show a summary:
 }
 
 async function createSettings(cwd, answers) {
-  // Settings function reserved for future use
+  // Create settings.local.json with skill activation hook
+  const settingsPath = path.join(cwd, ".claude", "settings.local.json");
+
+  // Read existing settings if present
+  let settings = {};
+  try {
+    const existing = await fs.readFile(settingsPath, "utf-8");
+    settings = JSON.parse(existing);
+  } catch {
+    // No existing settings, start fresh
+  }
+
+  // Ensure hooks object exists
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+
+  // Add UserPromptSubmit hook for skill activation
+  // This reminds Claude to check for applicable skills on each user prompt
+  settings.hooks.UserPromptSubmit = [
+    {
+      type: "command",
+      command: "echo 'FARMWORK: Check if any skills apply - farm-audit (open the farm), farm-inspect (count the herd), garden (ideas), research, production, market (go to market). Use matching skill if relevant.'"
+    }
+  ];
+
+  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2));
 }
 
 async function createProduceConfig(cwd, answers) {
