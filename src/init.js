@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "path";
 import { fileURLToPath } from "url";
 import { farmTerm, emojis } from "./terminal.js";
+import { selectSupplies, installSupplies } from "./supply.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,6 +72,18 @@ const QUESTIONS = [
     name: "includeI18n",
     message: "🌻 Include i18n support?",
     default: false,
+  },
+  {
+    type: "confirm",
+    name: "includeKnip",
+    message: "🔍 Include knip for dead code detection?",
+    default: false,
+  },
+  {
+    type: "confirm",
+    name: "addSupplies",
+    message: "🧺 Add farm supplies (MCP integrations)?",
+    default: true,
   },
 ];
 
@@ -149,6 +162,13 @@ export async function init(options) {
   );
 
   const answers = await inquirer.prompt(QUESTIONS);
+
+  // Supply selection
+  let selectedSupplyIds = [];
+  if (answers.addSupplies) {
+    selectedSupplyIds = await selectSupplies();
+  }
+  answers._selectedSupplies = selectedSupplyIds;
 
   // Check for existing files
   const existingFiles = [];
@@ -293,6 +313,15 @@ export async function init(options) {
       { name: "Laying out justfile", fn: () => createJustfile(cwd, answers) },
       { name: "Training agents", fn: () => createAgents(cwd, answers) },
       { name: "Cultivating skills", fn: () => createSkills(cwd, answers) },
+      {
+        name: "Stocking supplies",
+        fn: async () => {
+          if (answers._selectedSupplies.length > 0) {
+            await installSupplies(answers._selectedSupplies);
+          }
+        },
+        skip: () => answers._selectedSupplies.length === 0,
+      },
       { name: "Setting up commands", fn: () => createCommands(cwd, answers) },
       { name: "Configuring settings", fn: () => createSettings(cwd, answers) },
       {
@@ -302,6 +331,9 @@ export async function init(options) {
     ];
 
     for (const step of steps) {
+      if (step.skip && step.skip()) {
+        continue;
+      }
       await farmTerm.spin(step.name, step.fn);
     }
 
@@ -374,6 +406,22 @@ export async function init(options) {
         }
       }
     });
+
+    // Install knip if enabled
+    if (answers.includeKnip) {
+      await farmTerm.spin("Installing knip for dead code detection", async () => {
+        const { execSync } = await import("child_process");
+        try {
+          execSync(`${answers.packageManager} add -D knip`, {
+            cwd,
+            stdio: "pipe",
+          });
+        } catch {
+          farmTerm.warn("Could not install knip automatically.");
+          farmTerm.gray(`    Install manually: ${answers.packageManager} add -D knip\n`);
+        }
+      });
+    }
 
     // Success!
     farmTerm.nl();
@@ -1202,6 +1250,65 @@ _No composted ideas yet._
 `;
 
   await fs.writeFile(path.join(cwd, "_AUDIT", "COMPOST.md"), compostContent);
+
+  // Create KNIP.md if knip is enabled
+  if (answers.includeKnip) {
+    const knipContent = `# Knip Dead Code Report
+
+> Unused files, dependencies, and exports detected by knip.
+> Run \`npx knip --reporter compact\` to update.
+
+**Last Updated:** ${today}
+**Status:** Initial setup
+
+---
+
+## Summary
+
+| Category | Count |
+|----------|-------|
+| Unused Files | 0 |
+| Unused Dependencies | 0 |
+| Unused Exports | 0 |
+
+---
+
+## Unused Files
+
+_No unused files detected._
+
+---
+
+## Unused Dependencies
+
+_No unused dependencies detected._
+
+---
+
+## Unused Exports
+
+_No unused exports detected._
+
+---
+
+## Actions
+
+Review each finding before removal:
+- Some exports may be used dynamically (via string interpolation)
+- Some dependencies may be peer deps or build-only
+- Some files may be entry points not detected by knip
+
+---
+
+## Audit History
+
+| Date | Changes |
+|------|---------|
+| ${today} | Initial knip setup via Farmwork CLI |
+`;
+
+    await fs.writeFile(path.join(cwd, "_AUDIT", "KNIP.md"), knipContent);
+  }
 }
 
 async function createOfficeDocs(cwd, answers) {
@@ -1769,7 +1876,7 @@ Comprehensive code quality review covering:
 
 ## Code Smells
 - DRY violations (duplicated code)
-- Complexity issues (functions > 50 lines, deep nesting)
+- Complexity issues (functions > 1000 lines, deep nesting)
 - Naming issues (misleading names, abbreviations)
 - Magic values (hardcoded numbers/strings)
 - Technical debt (TODO, FIXME, HACK comments)
@@ -1858,6 +1965,19 @@ Comprehensive code cleanup for TypeScript/JavaScript files.
 ## Preserves
 - JSDoc comments (\`/** */\`)
 - \`console.error\`, \`console.warn\`, \`console.info\`
+
+## Knip Integration
+If knip is installed in the project, first run knip for comprehensive dead code detection:
+\\\`\\\`\\\`bash
+npx knip --reporter compact
+\\\`\\\`\\\`
+
+Knip finds:
+- Unused files (not imported anywhere)
+- Unused dependencies in package.json
+- Unused exports from modules
+
+Review knip output before manual cleanup. Some exports may be used dynamically.
 
 Use after refactoring, when removing features, or before production deployment.
 `,
@@ -2621,6 +2741,29 @@ Launch these agents in parallel using the Task tool:
 5. **code-cleaner** - Dead code + comment detection
    - Reports what would be cleaned (dry run)
 
+### Step 1b: Knip Analysis (if enabled)
+If knip is installed in the project, run dead code detection:
+
+\\\`\\\`\\\`bash
+npx knip --reporter compact
+\\\`\\\`\\\`
+
+Include findings:
+- Unused files
+- Unused dependencies
+- Unused exports
+
+### Step 1c: Knip Auto-Fix Prompt (if enabled)
+If knip found issues, ask user:
+"Would you like to run \\\`knip --fix --allow-remove-files\\\` to automatically fix issues?"
+
+If confirmed, run:
+\\\`\\\`\\\`bash
+npx knip --fix --allow-remove-files
+\\\`\\\`\\\`
+
+**Warning:** This modifies/deletes files. Review changes with \\\`git diff\\\` after running.
+
 ### Step 2: Dry Run Quality Gates
 Run these commands but do NOT commit or push:
 
@@ -2654,6 +2797,11 @@ Anti-patterns: X found
 ### Accessibility
 Score: X/10
 WCAG issues: X found
+
+### Dead Code (Knip)
+- Unused files: X
+- Unused deps: X
+- Unused exports: X
 
 ### Quality Gates
 - Lint: ✓/✗
@@ -3311,7 +3459,7 @@ async function createSettings(cwd, answers) {
 
 async function createProduceConfig(cwd, answers) {
   const config = {
-    version: "1.3.0",
+    version: "1.5.0",
     projectName: answers.projectName,
     commands: {
       test: answers.testCommand,
@@ -3320,8 +3468,10 @@ async function createProduceConfig(cwd, answers) {
     },
     features: {
       i18n: answers.includeI18n || false,
+      knip: answers.includeKnip || false,
     },
-    audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "ACCESSIBILITY", "CODE_QUALITY", "TESTS", "GARDEN", "COMPOST", "RESEARCH", "GREENFIELD", "BROWNFIELD"],
+    supplies: answers._selectedSupplies || [],
+    audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "ACCESSIBILITY", "CODE_QUALITY", "TESTS", "GARDEN", "COMPOST", "RESEARCH", "GREENFIELD", "BROWNFIELD", ...(answers.includeKnip ? ["KNIP"] : [])],
   };
 
   await fs.writeFile(

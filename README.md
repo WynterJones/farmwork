@@ -30,10 +30,11 @@ npx farmwork init
 1. **Skills** - Auto-activating workflows that respond to natural phrases
 2. **Slash Commands** - Explicit triggers for actions like `/push`
 3. **Agents** - 15 specialized AI subagents for specific tasks
-4. **Issue Tracking** - Using beads (`bd`) for full visibility
-5. **Living Audits** - Documents that track ongoing concerns
-6. **Plan & Implement** - You describe the outcome, the rest is handled
-7. **Idea Garden** - Pre-plan creative stage with natural aging
+4. **Supplies** - Built-in tools and MCP integrations to extend your farm
+5. **Issue Tracking** - Using beads (`bd`) for full visibility
+6. **Living Audits** - Documents that track ongoing concerns
+7. **Plan & Implement** - You describe the outcome, the rest is handled
+8. **Idea Garden** - Pre-plan creative stage with natural aging
 
 ### Skills (Auto-Activating Workflows)
 
@@ -83,6 +84,27 @@ Farmwork adds a `UserPromptSubmit` hook that reminds Claude to check for applica
 | `onboarding-agent` | Tours, tooltips, modals, empty states |
 | `user-guide-agent` | Feature documentation for help docs |
 
+### Supplies
+
+Supplies are optional tools and MCP integrations that extend your farm's capabilities. Add them during `farmwork init` or anytime with `farmwork supply`.
+
+#### Built-in Supplies
+
+| Supply | Purpose |
+|--------|---------|
+| `just` | Command runner for project tasks |
+| `beads` | Local, markdown-based issue tracking |
+| `knip` | Dead code detection (unused files, deps, exports) |
+
+#### MCP Supplies
+
+| Supply | Purpose | Requires |
+|--------|---------|----------|
+| `storybook` | Connect Claude to your component library | Storybook installed |
+| `context7` | Up-to-date library documentation | None |
+| `sentry` | Error tracking and monitoring | SENTRY_AUTH_TOKEN |
+| `images` | AI image generation (Gemini/OpenAI) | API keys |
+
 ### Recommended Workflow
 
 1. **Start Session**: Run `open the farm` to audit current state
@@ -120,6 +142,7 @@ your-project/
 │   ├── FARMHOUSE.md    # Framework command center
 │   ├── GARDEN.md       # Idea nursery
 │   ├── COMPOST.md      # Rejected ideas
+│   ├── KNIP.md         # Dead code report (if enabled)
 │   └── ... (security, performance, etc.)
 ├── _OFFICE/            # Product strategy
 │   ├── GREENFIELD.md   # Vision
@@ -144,12 +167,12 @@ farmwork init                    # Interactive setup wizard
 **Options:**
 - `-f, --force` - Overwrite existing files
 
-**Storybook Support:**
-If you enable Storybook (for React/Vue projects), the wizard will also ask for:
-- Storybook URL (e.g., storybook.yoursite.com)
-- Netlify Auth Token (for deployment)
-- Netlify Site ID
-- Password protection preference (recommended)
+**Optional Features:**
+During init, you'll be asked about optional features:
+- **i18n** - Internationalization support
+- **Storybook** - Component documentation (React/Vue projects)
+- **Knip** - Dead code detection (runs during farm-inspect)
+- **Supplies** - MCP integrations (Storybook, Context7, Sentry, Images)
 
 **Creates:**
 - `CLAUDE.md` - Lean instructions (references skills)
@@ -200,12 +223,32 @@ farmwork doctor
 - Issue tracking (beads)
 - Security (.gitignore settings)
 
+### `farmwork supply`
+
+Add supplies to your farm - tools and MCP integrations.
+
+```bash
+farmwork supply              # Interactive supply selection
+farmwork supply images       # Install specific supply
+```
+
+**Available Supplies:**
+- `storybook` - Storybook MCP server + skill
+- `context7` - Context7 MCP for library documentation
+- `sentry` - Sentry error tracking MCP
+- `images` - AI image generation (Gemini/OpenAI)
+
+**What It Does:**
+1. Installs the MCP server via `claude mcp add`
+2. Creates a corresponding skill in `.claude/skills/`
+3. Configures any required API keys
 
 ## Requirements
 
 - Node.js 18+
 - [just](https://github.com/casey/just) (recommended for navigation)
 - [beads](https://github.com/steveyegge/beads) (for issue tracking)
+- [knip](https://knip.dev) (optional, for dead code detection)
 
 ## License
 
