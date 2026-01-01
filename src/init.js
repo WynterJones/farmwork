@@ -1964,6 +1964,8 @@ Comprehensive code cleanup for TypeScript/JavaScript files.
 
 ## Preserves
 - JSDoc comments (\`/** */\`)
+- ESLint directive comments (\`// eslint-disable\`, \`// eslint-enable\`, \`// eslint-disable-next-line\`, etc.)
+- TypeScript directive comments (\`// @ts-ignore\`, \`// @ts-expect-error\`, \`// @ts-nocheck\`)
 - \`console.error\`, \`console.warn\`, \`console.info\`
 
 ## Knip Integration
@@ -3335,6 +3337,13 @@ find . -name '.DS_Store' -type f -delete
 \`\`\`
 
 ### Step 2: Sync Packages
+First check if package.json exists in the project root.
+
+**If no package.json exists:**
+- Output in gray text: "(skipped - no package.json)"
+- Continue to Step 3
+
+**If package.json exists:**
 Clean and reinstall node_modules to ensure package-lock.json stays in sync:
 \`\`\`bash
 rm -rf node_modules && ${pm} install
@@ -3361,6 +3370,8 @@ This removes:
 
 It preserves:
 - JSDoc comments (\`/** */\`)
+- ESLint directives (\`// eslint-disable\`, \`// eslint-disable-next-line\`, etc.)
+- TypeScript directives (\`// @ts-ignore\`, \`// @ts-expect-error\`, etc.)
 - \`console.error\`, \`console.warn\`, \`console.info\`
 
 After cleaning, re-stage the modified files:
@@ -3370,11 +3381,24 @@ git add -A
 
 ### Step 6: Run Quality Gates (in order)
 
-Run each check. If any fails, stop and report which check failed:
+First, read package.json to check which scripts exist. For each quality gate:
 
-1. **Lint**: \`${answers.lintCommand}\`
-2. **Unit Tests**: \`${answers.testCommand}\`
-3. **Build**: \`${answers.buildCommand}\`
+1. **Lint**:
+   - Check if "lint" script exists in package.json
+   - If exists: Run \`${answers.lintCommand}\`
+   - If not: Output in gray text "(skipped - no lint script)"
+
+2. **Unit Tests**:
+   - Check if "test" script exists in package.json
+   - If exists: Run \`${answers.testCommand}\`
+   - If not: Output in gray text "(skipped - no test script)"
+
+3. **Build**:
+   - Check if "build" script exists in package.json
+   - If exists: Run \`${answers.buildCommand}\`
+   - If not: Output in gray text "(skipped - no build script)"
+
+If any existing check fails, stop and report which check failed.
 
 ### Step 7: Generate Commit Message
 
