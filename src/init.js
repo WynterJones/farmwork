@@ -323,7 +323,6 @@ export async function init(options) {
         skip: () => answers._selectedSupplies.length === 0,
       },
       { name: "Setting up commands", fn: () => createCommands(cwd, answers) },
-      { name: "Configuring settings", fn: () => createSettings(cwd, answers) },
       {
         name: "Writing .farmwork.json",
         fn: () => createProduceConfig(cwd, answers),
@@ -3451,35 +3450,6 @@ Show a summary:
 
 }
 
-async function createSettings(cwd, answers) {
-  // Create settings.local.json with skill activation hook
-  const settingsPath = path.join(cwd, ".claude", "settings.local.json");
-
-  // Read existing settings if present
-  let settings = {};
-  try {
-    const existing = await fs.readFile(settingsPath, "utf-8");
-    settings = JSON.parse(existing);
-  } catch {
-    // No existing settings, start fresh
-  }
-
-  // Ensure hooks object exists
-  if (!settings.hooks) {
-    settings.hooks = {};
-  }
-
-  // Add UserPromptSubmit hook for skill activation
-  // This reminds Claude to check for applicable skills on each user prompt
-  settings.hooks.UserPromptSubmit = [
-    {
-      type: "command",
-      command: "echo 'FARMWORK: Check if any skills apply - farm-audit (open the farm), farm-inspect (count the herd), garden (ideas), research, production, market (go to market). Use matching skill if relevant.'"
-    }
-  ];
-
-  await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2));
-}
 
 async function createProduceConfig(cwd, answers) {
   const config = {

@@ -58,10 +58,6 @@ Skills auto-activate when you use these natural phrases:
 | `/push` | Lint, test, build, commit, push (11 steps) |
 | `/office` | Interactive strategy setup |
 
-### Skill Activation Hook
-
-Farmwork adds a `UserPromptSubmit` hook that reminds Claude to check for applicable skills. This improves activation reliability over phrase commands in CLAUDE.md.
-
 ### Agents
 
 15 specialized agents included:
@@ -180,7 +176,7 @@ During init, you'll be asked about optional features:
   - `skills/` - 6 auto-activating workflows (farm-audit, farm-inspect, garden, research, production, market)
   - `agents/` - 15 specialized subagents
   - `commands/` - 2 slash commands (/push, /office)
-  - `settings.local.json` - Skill activation hook
+
 - `_AUDIT/` - Living audit documents
   - `FARMHOUSE.md`, `GARDEN.md`, `COMPOST.md`, and more
 - `_OFFICE/` - Product strategy documents

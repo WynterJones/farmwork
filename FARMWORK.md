@@ -118,10 +118,6 @@ Skills are Claude Code's auto-activating workflows. They respond to natural phra
 | `/push` | Lint, test, build, commit, push |
 | `/office` | Interactive strategy setup |
 
-### 5. Skill Activation Hook
-
-Farmwork adds a `UserPromptSubmit` hook that reminds Claude to check for applicable skills on each message. This improves activation reliability.
-
 ---
 
 ## Setup Guide
@@ -668,7 +664,7 @@ Creating Farmwork structure...
 ✓ Created CLAUDE.md
 ✓ Created _AUDIT/FARMHOUSE.md
 ✓ Created justfile
-✓ Created .claude/settings.local.json              # If Storybook enabled
+
 ✓ Initialized beads (bd init)
 ✓ Installed just (if missing)
 
@@ -875,7 +871,7 @@ bd sync
   - `research` - systematic research
   - `production` - "go to production" readiness check
   - `market` - "go to market" i18n + accessibility
-- Added **UserPromptSubmit hook** for reliable skill activation
+
 - **Simplified CLAUDE.md** from ~340 lines to ~75 lines
 - Skills auto-activate on natural phrases (same UX, better reliability)
 - Workflow details moved from CLAUDE.md to individual SKILL.md files
