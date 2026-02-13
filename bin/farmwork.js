@@ -4,7 +4,6 @@ import { program } from 'commander';
 import { init } from '../src/init.js';
 import { status } from '../src/status.js';
 import { doctor } from '../src/doctor.js';
-import { supply } from '../src/supply.js';
 import chalk from 'chalk';
 
 const VERSION = '1.0.0';
@@ -35,10 +34,5 @@ program
   .command('doctor')
   .description('Check Farmwork setup and diagnose issues')
   .action(doctor);
-
-program
-  .command('supply [name]')
-  .description('Add farm supplies (MCP integrations)')
-  .action(supply);
 
 program.parse();

@@ -883,7 +883,7 @@ bd sync
 - Added **"update research on..."** phrase - refreshes existing research with new findings
 - Added **"show research on..."** phrase - displays research summary and staleness status
 - Added **`researcher` agent** - spawns parallel subagents for comprehensive research
-- Added optional **ref.tools MCP integration** for enhanced documentation lookup
+
 - Research documents track freshness: Fresh (0-14 days) → Aging (15-30 days) → Stale (30+ days)
 - Updated `the-farmer` agent to check research staleness during audits
 - Updated `farmwork status` and `farmwork doctor` to include research documents

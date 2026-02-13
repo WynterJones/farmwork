@@ -1,6 +1,6 @@
 {
   "name": "farmwork",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "type": "module",
   "description": "Farmwork - A workflow framework for Claude Code by Wynter Jones",
   "main": "src/index.js",

@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import path from "path";
 import { fileURLToPath } from "url";
 import { farmTerm, emojis } from "./terminal.js";
-import { selectSupplies, installSupplies } from "./supply.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,12 +78,6 @@ const QUESTIONS = [
     name: "includeKnip",
     message: "🔍 Include knip for dead code detection?",
     default: false,
-  },
-  {
-    type: "confirm",
-    name: "addSupplies",
-    message: "🧺 Add farm supplies (MCP integrations)?",
-    default: true,
   },
 ];
 
@@ -162,13 +156,6 @@ export async function init(options) {
   );
 
   const answers = await inquirer.prompt(QUESTIONS);
-
-  // Supply selection
-  let selectedSupplyIds = [];
-  if (answers.addSupplies) {
-    selectedSupplyIds = await selectSupplies();
-  }
-  answers._selectedSupplies = selectedSupplyIds;
 
   // Check for existing files
   const existingFiles = [];
@@ -313,15 +300,6 @@ export async function init(options) {
       { name: "Laying out justfile", fn: () => createJustfile(cwd, answers) },
       { name: "Training agents", fn: () => createAgents(cwd, answers) },
       { name: "Cultivating skills", fn: () => createSkills(cwd, answers) },
-      {
-        name: "Stocking supplies",
-        fn: async () => {
-          if (answers._selectedSupplies.length > 0) {
-            await installSupplies(answers._selectedSupplies);
-          }
-        },
-        skip: () => answers._selectedSupplies.length === 0,
-      },
       { name: "Setting up commands", fn: () => createCommands(cwd, answers) },
       {
         name: "Writing .farmwork.json",
@@ -2105,7 +2083,7 @@ Creates and maintains living research documents in \`_RESEARCH/\`.
 3. **Security Analysis** - Identifies CVEs, known vulnerabilities, security best practices
 4. **Tech Stack Analysis** - Analyzes dependencies, compatibility, bundle size
 5. **Community Insights** - Gathers gotchas, common issues, best practices from community
-6. **MCP Integration** - Uses ref.tools MCP when available for enhanced documentation access
+
 
 ## Instructions
 
@@ -2121,7 +2099,7 @@ Create focused subtasks for parallel execution using the Task tool:
 - Find official documentation sites
 - Identify API references and getting started guides
 - Locate migration guides if applicable
-- If ref.tools MCP available: Query \`mcp__Ref__ref_search_documentation\` for relevant docs
+
 
 **Security Research Task:**
 - Search for known CVEs related to the topic
@@ -3464,7 +3442,6 @@ async function createProduceConfig(cwd, answers) {
       i18n: answers.includeI18n || false,
       knip: answers.includeKnip || false,
     },
-    supplies: answers._selectedSupplies || [],
     audits: ["FARMHOUSE", "SECURITY", "PERFORMANCE", "ACCESSIBILITY", "CODE_QUALITY", "TESTS", "GARDEN", "COMPOST", "RESEARCH", "GREENFIELD", "BROWNFIELD", ...(answers.includeKnip ? ["KNIP"] : [])],
   };
 
