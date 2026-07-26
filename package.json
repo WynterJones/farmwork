@@ -1,6 +1,6 @@
 {
   "name": "farmwork",
-  "version": "1.5.3",
+  "version": "2.0.0",
   "type": "module",
   "description": "Farmwork - A workflow framework for Claude Code by Wynter Jones",
   "main": "src/index.js",
@@ -9,8 +9,7 @@
   },
   "files": [
     "src",
-    "bin",
-    "templates"
+    "bin"
   ],
   "scripts": {
     "test": "node --test",
@@ -32,7 +31,6 @@
     "commander": "^12.1.0",
     "fs-extra": "^11.2.0",
     "inquirer": "^9.2.12",
-    "ora": "^8.0.1",
     "terminal-kit": "^3.1.1"
   },
   "engines": {
