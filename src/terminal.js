@@ -53,6 +53,8 @@ const emojis = {
   grapes: "🍇",
   peach: "🍑",
   cherry: "🍒",
+  // Misc
+  arrow: "→",
 };
 
 // ASCII Art
