@@ -85,6 +85,7 @@ Skills auto-activate when you use these natural phrases:
 ```
 your-project/
 ├── CLAUDE.md              # Lean instructions (references skills)
+├── AGENTS.md              # Same workflow, plain instructions for Codex/Gemini CLI/etc.
 ├── _AUDIT/                 # Living audit + idea documents
 │   ├── FARMHOUSE.md         # Framework command center / metrics
 │   ├── GARDEN.md            # Idea nursery
@@ -119,6 +120,8 @@ farmwork init                    # Auto-detects everything, confirms and goes
 
 **Creates:**
 - `CLAUDE.md` - Lean instructions (references skills)
+- `AGENTS.md` - Same core workflow as plain instructions, for Codex, Gemini CLI, and
+  other AI coding assistants that don't support Claude Code's skills/subagents
 - `.claude/` - Claude Code configuration directory
   - `skills/` - 2 auto-activating workflows (farm-audit, garden)
   - `agents/` - 4 focused subagents
@@ -154,9 +157,17 @@ farmwork doctor
 - Audit system (`_AUDIT/FARMHOUSE.md`, `_AUDIT/GARDEN.md`, `_AUDIT/COMPOST.md`, `_PLANS/`)
 - Security (`.gitignore` settings)
 
+## Cross-Tool Support
+
+Farmwork's phrase workflows are built around Claude Code's skills, but the CLI also
+generates `AGENTS.md` - a plain-instructions version of the same workflow (folder
+structure, phrase-triggered audits/garden, plan-first development) for Codex, Gemini
+CLI, and other AI coding assistants that can't auto-invoke `.claude/skills/`.
+
 ## Requirements
 
-- [Claude Code](https://claude.com/claude-code)
+- [Claude Code](https://claude.com/claude-code), or another AI coding assistant that
+  reads `AGENTS.md` (Codex, Gemini CLI, etc.)
 - Node.js 18+
 
 No other tools required - Farmwork has no external CLI dependencies.

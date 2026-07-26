@@ -142,6 +142,7 @@ export async function init(options) {
   const existingFiles = [];
   const filesToCheck = [
     { path: path.join(cwd, "CLAUDE.md"), name: "CLAUDE.md", backup: "OLD_CLAUDE.md" },
+    { path: path.join(cwd, "AGENTS.md"), name: "AGENTS.md", backup: "OLD_AGENTS.md" },
     { path: path.join(cwd, ".claude", "commands"), name: ".claude/commands/", backup: null, isDir: true },
     { path: path.join(cwd, ".claude", "agents"), name: ".claude/agents/", backup: null, isDir: true },
     { path: path.join(cwd, ".claude", "skills"), name: ".claude/skills/", backup: null, isDir: true },
@@ -224,6 +225,7 @@ export async function init(options) {
         },
       },
       { name: "Planting CLAUDE.md", fn: () => createClaudeMd(cwd, answers) },
+      { name: "Growing AGENTS.md", fn: () => createAgentsMd(cwd, answers) },
       { name: "Building FARMHOUSE.md", fn: () => createFarmhouseMd(cwd, answers) },
       { name: "Creating the Idea Garden", fn: () => createGardenDocs(cwd, answers) },
       { name: "Training agents", fn: () => createAgents(cwd, answers) },
@@ -248,6 +250,7 @@ export async function init(options) {
         ".claude/agents/",
         ".claude/commands/",
         "CLAUDE.md",
+        "AGENTS.md",
       ],
       "Files planted",
     );
@@ -370,6 +373,95 @@ For any non-trivial feature:
 `;
 
   await fs.writeFile(path.join(cwd, "CLAUDE.md"), content);
+}
+
+async function createAgentsMd(cwd, answers) {
+  const content = `# ${answers.projectName}
+
+## Farmwork (Generic AI Assistant Instructions)
+
+This project uses the Farmwork workflow. \`AGENTS.md\` is for AI coding assistants that
+don't support Claude Code's native skills/subagents (Codex, Gemini CLI, and similar
+tools) - it documents the same workflow as \`CLAUDE.md\`, written as plain instructions
+you follow directly instead of auto-activating skills.
+
+If you're Claude Code, use \`CLAUDE.md\` instead - it references \`.claude/skills/\`
+for these same workflows.
+
+---
+
+## Phrase-Triggered Workflows
+
+When the user uses one of these phrases, follow the matching steps yourself - there
+are no skills or subagents to invoke here, so do the work directly.
+
+### "open the farm" - Quick Audit
+1. Count commands, agents, skills, tests, and plans:
+   - Commands: \`ls -1 .claude/commands/*.md 2>/dev/null | wc -l\`
+   - Agents: \`ls -1 .claude/agents/*.md 2>/dev/null | wc -l\`
+   - Skills: \`ls -d .claude/skills/*/ 2>/dev/null | wc -l\`
+   - Tests: \`find . -name "*.test.*" -not -path "./node_modules/*" | wc -l\`
+   - Plans: \`ls -1 _PLANS/*.md 2>/dev/null | wc -l\` (total + completed)
+2. Read \`_AUDIT/GARDEN.md\` and check each idea's \`**Planted:**\` date:
+   - 45-60 days old: mark \`⚠️ WILTING\`
+   - 60+ days old: move the idea to \`_AUDIT/COMPOST.md\` and remove it from GARDEN.md
+3. Update \`_AUDIT/FARMHOUSE.md\` with fresh metrics, a score, and an audit history entry
+
+### "count the herd" - Deep Audit
+Everything in "open the farm", plus:
+4. Review the codebase yourself for quality, security, performance, code smells, and
+   basic accessibility. Report findings inline (severity + suggested fix) - don't
+   create new audit files for this.
+5. Run lint/test/build as a dry run only (no commits, no pushes) and report status
+
+### Idea Garden Phrases
+| Phrase | Action |
+|--------|--------|
+| "I have an idea for..." | Add a new entry to \`_AUDIT/GARDEN.md\` with today's \`**Planted:**\` date |
+| "water the garden" | Read GARDEN.md + COMPOST.md, propose 10 new ideas, plant the ones the user picks |
+| "compost this..." | Move the idea to \`_AUDIT/COMPOST.md\` with a reason, remove it from GARDEN.md |
+| "let's plan this idea..." | Write a plan to \`_PLANS/\`, move the idea into GARDEN.md's "Graduated to Plans" table |
+
+---
+
+## Plan-First Development
+
+For any non-trivial feature, before writing code:
+1. Write the plan to \`_PLANS/<FEATURE_NAME>.md\` (SCREAMING_SNAKE_CASE filename)
+2. Ask "Ready to start implementing?" and wait for an explicit yes before coding
+
+---
+
+## Shipping Changes
+
+There's no \`/push\` slash command outside Claude Code, so do this manually when asked
+to ship:
+1. Remove \`.DS_Store\` files, then stage changes (\`git add -A\`)
+2. Clean up obvious dead code/console.logs/comments (keep JSDoc and lint/ts directives)
+3. Run lint, test, and build - stop if any fail
+4. Commit with a descriptive message, then push
+5. Update \`_AUDIT/FARMHOUSE.md\` metrics
+
+---
+
+## Project Configuration
+
+- **Test:** \`${answers.testCommand}\`
+- **Build:** \`${answers.buildCommand}\`
+- **Lint:** \`${answers.lintCommand}\`
+
+---
+
+## Directory Structure
+
+| Directory | Purpose |
+|-----------|---------|
+| \`_AUDIT/\` | Living audit + idea documents (FARMHOUSE, GARDEN, COMPOST) |
+| \`_PLANS/\` | Feature implementation plans |
+| \`.claude/\` | Claude Code configuration (skills/agents/commands) - not used by other tools |
+`;
+
+  await fs.writeFile(path.join(cwd, "AGENTS.md"), content);
 }
 
 async function createFarmhouseMd(cwd, answers) {

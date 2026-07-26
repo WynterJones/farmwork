@@ -28,7 +28,13 @@ The farming metaphor makes workflows memorable:
 - `/push` = review, quality gate, commit, and push
 
 Farmwork has **no external CLI dependencies**. There is no issue tracker to install, no
-task runner, and no product-strategy scaffolding to fill in - just Claude Code and Node.js.
+task runner, and no product-strategy scaffolding to fill in - just an AI coding
+assistant and Node.js.
+
+Farmwork works with Claude Code, Codex, and Gemini CLI. Claude Code gets native
+auto-activating skills and subagents; other tools get the same workflow via
+`AGENTS.md` - a plain-instructions file since they can't invoke `.claude/skills/`
+directly.
 
 ---
 
@@ -39,6 +45,7 @@ task runner, and no product-strategy scaffolding to fill in - just Claude Code a
 ```
 your-project/
 ├── CLAUDE.md              # AI instructions (lean - references skills)
+├── AGENTS.md              # Same workflow, plain instructions for non-Claude tools
 ├── _AUDIT/                 # Living audit + idea documents
 │   ├── FARMHOUSE.md         # Framework command center / metrics
 │   ├── GARDEN.md            # Idea nursery (pre-plan stage)
@@ -104,6 +111,14 @@ handle multi-step processes. Workflow details live in `.claude/skills/[skill-nam
 | `code-reviewer` | Single comprehensive reviewer: quality, security (OWASP-lite), performance, code smells, and basic accessibility. Reports findings inline with severity - no separate audit docs per concern |
 | `code-cleaner` | Removes comments (except JSDoc), console.logs, and obvious dead code before pushing |
 | `idea-gardener` | Manages `_AUDIT/GARDEN.md` and `_AUDIT/COMPOST.md` idea lifecycle |
+
+### 6. AGENTS.md (Cross-Tool Support)
+
+Codex, Gemini CLI, and other AI coding assistants don't support Claude Code's native
+skills/subagents, so they can't auto-invoke `.claude/skills/`. `AGENTS.md` documents
+the same core workflow - folder structure, the "open the farm" / "count the herd"
+audit phrases, the Idea Garden phrases, and plan-first development - as plain
+instructions the assistant follows directly instead of an auto-activating skill.
 
 ---
 
