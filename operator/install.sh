@@ -118,4 +118,5 @@ gray "  Docs   https://farmwork.dev/concepts/operator.html"
 gray "  Repo   https://github.com/wynterjones/farmwork"
 echo
 gray "  To connect FarmFactory (free UI for your farms + checklists):"
-gray "    https://farmwork.dev/farmfactory.html"
+gray "    App    https://factory.farmwork.dev"
+gray "    About  https://farmwork.dev/farmfactory.html"

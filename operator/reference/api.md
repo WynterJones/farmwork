@@ -1,6 +1,7 @@
 # FarmFactory API
 
-Base URL from `farmfactory.baseUrl` in `~/.operator/config.json` (or `FARMFACTORY_URL`).
+Base URL from `farmfactory.baseUrl` in `~/.operator/config.json` (or `FARMFACTORY_URL`);
+the hosted instance is `https://factory.farmwork.dev`.
 Every request needs the `X-API-Key` header; keys are created in FarmFactory under
 Admin → API Keys. A bad or missing key returns `401 {"error":"Unauthorized"}`.
 

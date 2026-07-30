@@ -1,6 +1,6 @@
 {
   "farmfactory": {
-    "baseUrl": "",
+    "baseUrl": "https://factory.farmwork.dev",
     "apiKey": ""
   },
   "groups": [

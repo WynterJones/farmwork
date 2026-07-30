@@ -57,7 +57,7 @@ Or edit `~/.operator/config.json` directly:
 
 ```json
 {
-  "farmfactory": { "baseUrl": "https://farm.example.com", "apiKey": "…" },
+  "farmfactory": { "baseUrl": "https://factory.farmwork.dev", "apiKey": "…" },
   "groups": [
     {
       "name": "Products",
@@ -80,11 +80,12 @@ it the Operator falls back to matching on name.
 
 ## Connect FarmFactory
 
-Create an API key in FarmFactory under **Admin → API Keys**, then either put
+FarmFactory runs at [factory.farmwork.dev](https://factory.farmwork.dev) - free, and part
+of the Wynter.ai suite. Create an API key under **Admin → API Keys**, then either put
 `baseUrl` and `apiKey` in the config, or export them:
 
 ```bash
-export FARMFACTORY_URL="https://farm.example.com"
+export FARMFACTORY_URL="https://factory.farmwork.dev"
 export FARMFACTORY_API_KEY="…"
 ```
 

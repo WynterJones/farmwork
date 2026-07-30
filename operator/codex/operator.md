@@ -79,6 +79,7 @@ Confirm by running `operator status` and showing them the result.
 FarmFactory needs a base URL and an API key (from that app's admin area), set under
 `farmfactory` in `~/.operator/config.json` or exported as `FARMFACTORY_URL` /
 `FARMFACTORY_API_KEY`. The git sweep works without it; only checklist commands need it.
-It's free and part of the Wynter.ai suite — https://farmwork.dev/farmfactory.html
+It runs at https://factory.farmwork.dev — free, part of the Wynter.ai suite.
+What it is and why: https://farmwork.dev/farmfactory.html
 
 Never print the API key.

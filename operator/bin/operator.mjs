@@ -218,12 +218,15 @@ async function cmdInit() {
     console.log(`Config already exists: ${CONFIG_PATH}`);
     return;
   }
+  // Pre-fill the hosted instance so setup only needs an API key. Overridable
+  // via config or FARMFACTORY_URL for self-hosted deployments.
   saveConfig({
-    farmfactory: { baseUrl: "", apiKey: "" },
+    farmfactory: { baseUrl: "https://factory.farmwork.dev", apiKey: "" },
     groups: [{ name: "Default", description: "", farms: [] }],
   });
   console.log(`Created ${CONFIG_PATH}`);
   console.log("Add farms with: operator add <name> <path> --group <group>");
+  console.log("Add an API key from factory.farmwork.dev to enable checklists.");
 }
 
 function cmdGroups(config) {

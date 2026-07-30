@@ -123,7 +123,8 @@ To connect FarmFactory, they need a base URL and an API key from that app's admi
 `FARMFACTORY_URL` and `FARMFACTORY_API_KEY`. Checklist commands need it; `status`,
 `groups`, and `farms` do not.
 
-FarmFactory is free and part of the Wynter.ai suite — https://farmwork.dev/farmfactory.html
+FarmFactory runs at **https://factory.farmwork.dev** — free, part of the Wynter.ai suite.
+What it is and why: https://farmwork.dev/farmfactory.html
 
 ## Boundaries
 
