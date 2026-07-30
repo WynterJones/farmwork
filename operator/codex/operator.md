@@ -64,9 +64,21 @@ see in FarmFactory. Reads need no confirmation; writes need the user to have ask
 
 ## Setup
 
-No config? Run `operator init`, then help register farms. FarmFactory needs a base URL
-and an API key (created in that app's admin area), set under `farmfactory` in
-`~/.operator/config.json` or exported as `FARMFACTORY_URL` / `FARMFACTORY_API_KEY`.
-The git sweep works without it; only checklist commands need it.
+No config? Run `operator init` first, then help register farms.
+
+Grouping is the one place guessing does real damage — a wrong grouping quietly makes
+every future sweep less useful. So: find the real git repos on disk, **propose** a
+grouping with your reasoning, and ask them to correct it before writing anything.
+Group names encode how *they* think about their portfolio; never silently invent one
+and file repos into it. Set `slug` only when you know the FarmFactory slug — a wrong
+slug matches the wrong checklist, which is worse than the name-matching fallback. Skip
+archived or dormant repos unless told otherwise.
+
+Confirm by running `operator status` and showing them the result.
+
+FarmFactory needs a base URL and an API key (from that app's admin area), set under
+`farmfactory` in `~/.operator/config.json` or exported as `FARMFACTORY_URL` /
+`FARMFACTORY_API_KEY`. The git sweep works without it; only checklist commands need it.
+It's free and part of the Wynter.ai suite — https://farmwork.dev/farmfactory.html
 
 Never print the API key.

@@ -90,10 +90,32 @@ if [ -z "$LINKED" ]; then
 fi
 
 if [ -n "${CREATED_CONFIG:-}" ]; then
-  echo "Next:"
-  gray "  1. Register a farm:  operator add MyApp ~/code/my-app --group Products"
-  gray "  2. Connect FarmFactory: put baseUrl + apiKey in $OPERATOR_HOME/config.json"
-  gray "  3. In Claude Code or Codex, run: /operator"
+  green "Next: let the Operator set itself up."
 else
-  gray "Existing registry left untouched. Run /operator to use it."
+  gray "Existing registry left untouched."
+  echo
+  green "Run this to re-check your setup:"
 fi
+
+echo
+gray "  Open Claude Code or Codex and paste this:"
+echo
+cat <<'PROMPT'
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Set up my Operator. Read ~/.operator/config.json, then look  │
+  │  at the repos I actually have on disk and help me register    │
+  │  them as farms in sensible groups. Ask me what each group     │
+  │  should be called and what belongs in it rather than          │
+  │  guessing. Then check the FarmFactory connection and tell me  │
+  │  what's still missing.                                        │
+  └──────────────────────────────────────────────────────────────┘
+PROMPT
+echo
+gray "  It will ask before grouping anything, so the registry"
+gray "  reflects how you actually think about your projects."
+echo
+gray "  Docs   https://farmwork.dev/concepts/operator.html"
+gray "  Repo   https://github.com/wynterjones/farmwork"
+echo
+gray "  To connect FarmFactory (free UI for your farms + checklists):"
+gray "    https://farmwork.dev/farmfactory.html"

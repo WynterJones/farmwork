@@ -98,13 +98,32 @@ need the user to have actually asked for that change.
 
 ## Setup
 
-If `operator status` reports no config, run `operator init`, then help the user
-register farms. To connect FarmFactory, they need a base URL and an API key created
-in that app's admin area; either set them in `~/.operator/config.json` under
-`farmfactory`, or export `FARMFACTORY_URL` and `FARMFACTORY_API_KEY`.
+If `operator status` reports no config, run `operator init` first.
 
-Checklist commands need that connection; `status`, `groups`, and `farms` do not — the
-git sweep still works with no API configured.
+When helping register farms — this is the one place where guessing does real damage,
+because a wrong grouping quietly makes every future sweep less useful:
+
+1. Look at what's actually on disk. Ask where their repos live, then check which
+   directories are real git repos rather than assuming.
+2. **Propose groups, don't impose them.** Show the repos you found, suggest a grouping
+   with your reasoning, and ask them to correct it. Group names encode how *they*
+   think about their portfolio — "Products / Sites / Tools" may be completely wrong for
+   them. Never silently invent a group and file things into it.
+3. Set `slug` only when you know the FarmFactory repo slug. A wrong slug silently
+   matches the wrong checklist, which is worse than no slug at all — without one the
+   Operator falls back to name matching.
+4. Skip anything archived or dormant unless they say otherwise. A registry full of
+   repos they don't touch buries the farms that matter.
+
+Then confirm the result: run `operator status` and show them what it produced, so they
+can see the grouping before it becomes the thing they read every morning.
+
+To connect FarmFactory, they need a base URL and an API key from that app's admin area
+— either in `~/.operator/config.json` under `farmfactory`, or exported as
+`FARMFACTORY_URL` and `FARMFACTORY_API_KEY`. Checklist commands need it; `status`,
+`groups`, and `farms` do not.
+
+FarmFactory is free and part of the Wynter.ai suite — https://farmwork.dev/farmfactory.html
 
 ## Boundaries
 
