@@ -3,11 +3,11 @@ import path from "path";
 import { execSync } from "child_process";
 import { farmTerm, emojis } from "./terminal.js";
 
-function countFiles(dir, pattern) {
+function countTestFiles(dir) {
   try {
     if (!fs.existsSync(dir)) return 0;
     const result = execSync(
-      `find "${dir}" -name "${pattern}" -not -path "*/node_modules/*" 2>/dev/null | wc -l`,
+      `find "${dir}" -name "*.test.*" -not -path "*/node_modules/*" 2>/dev/null | wc -l`,
       { encoding: "utf8" },
     );
     return parseInt(result.trim()) || 0;
@@ -121,7 +121,7 @@ export async function status() {
   }
 
   // Project Metrics Section
-  const testFiles = countFiles(cwd, "*.test.ts") + countFiles(cwd, "*.test.tsx") + countFiles(cwd, "*.test.js");
+  const testFiles = countTestFiles(cwd);
 
   if (testFiles > 0) {
     farmTerm.section("Project Metrics", emojis.sunflower);

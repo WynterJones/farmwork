@@ -72,24 +72,6 @@ const TRACTOR_ART = `
     \\/  |____|  \\/
 `;
 
-const BARN_ART = `
-        /\\
-       /  \\
-      /    \\
-     /______\\
-    |  FARM  |
-    |  WORK  |
-    |________|
-`;
-
-const SMALL_TRACTOR = `
-   __
-  |==|___
- [|  |   \\
- [|__|____\\>
-  ()    ()
-`;
-
 // Main logo with apple and FARMWORK text
 const LOGO_ART = {
   apple: [
@@ -123,42 +105,10 @@ const LOGO_COMPACT = {
   tagline: "Agentic Development Harness",
 };
 
-// Animation frames for various states
-const GROWING_FRAMES = ["🌱", "🌿", "🌳", "🌲", "🌴"];
-const HARVEST_FRAMES = ["🌾", "🌾🌾", "🌾🌾🌾", "🌾🌾", "🌾"];
-const TRACTOR_FRAMES = ["🚜  ", " 🚜 ", "  🚜", " 🚜 "];
-const WEATHER_FRAMES = [
-  "☀️ ",
-  "🌤️",
-  "⛅",
-  "🌥️",
-  "☁️",
-  "🌧️",
-  "⛈️",
-  "🌧️",
-  "☁️",
-  "🌥️",
-  "⛅",
-  "🌤️",
-];
-
 class FarmTerminal {
   constructor() {
     this.term = term;
-    this.colors = colors;
     this.emojis = emojis;
-    this.spinnerInterval = null;
-    this.progressBar = null;
-  }
-
-  // Clear screen
-  clear() {
-    term.clear();
-  }
-
-  // Move cursor
-  moveTo(x, y) {
-    term.moveTo(x, y);
   }
 
   // Print styled header
@@ -207,32 +157,6 @@ class FarmTerminal {
     colors[style]("└" + "─".repeat(width - 2) + "┘\n");
   }
 
-  // Table display
-  table(headers, rows) {
-    const width = Math.min(term.width || 60, 60);
-    const colWidth = Math.floor((width - 4) / headers.length);
-
-    term("\n");
-    term.gray("┌" + headers.map(() => "─".repeat(colWidth)).join("┬") + "┐\n");
-    term.gray("│");
-    for (const h of headers) {
-      term.bold.white(` ${h}`.slice(0, colWidth - 1).padEnd(colWidth));
-    }
-    term.gray("│\n");
-    term.gray("├" + headers.map(() => "─".repeat(colWidth)).join("┼") + "┤\n");
-
-    for (const row of rows) {
-      term.gray("│");
-      for (let i = 0; i < headers.length; i++) {
-        const cell = row[i] || "";
-        term(` ${cell}`.slice(0, colWidth - 1).padEnd(colWidth));
-      }
-      term.gray("│\n");
-    }
-
-    term.gray("└" + headers.map(() => "─".repeat(colWidth)).join("┴") + "┘\n");
-  }
-
   // Animated spinner with custom message
   async spin(message, asyncFn) {
     const frames = ["🌱", "🌿", "🌳", "🌲", "🌴", "🌲", "🌳", "🌿"];
@@ -265,33 +189,6 @@ class FarmTerminal {
     }
   }
 
-  // Simple spinner without async
-  startSpinner(message) {
-    const frames = ["🌱", "🌿", "🌳", "🌲", "🌴", "🌲", "🌳", "🌿"];
-    let frameIndex = 0;
-
-    this.spinnerInterval = setInterval(() => {
-      term.column(1);
-      term.eraseLine();
-      term.yellow(`  ${frames[frameIndex]} ${message}`);
-      frameIndex = (frameIndex + 1) % frames.length;
-    }, 120);
-  }
-
-  stopSpinner(message, success = true) {
-    if (this.spinnerInterval) {
-      clearInterval(this.spinnerInterval);
-      this.spinnerInterval = null;
-    }
-    term.column(1);
-    term.eraseLine();
-    if (success) {
-      term.green(`  🌿 ${message}\n`);
-    } else {
-      term.red(`  🥀 ${message}\n`);
-    }
-  }
-
   // Tractor animation (drives across screen)
   async tractorAnimation(message, durationMs = 2000) {
     const tractorFrames = ["🚜💨", "🚜 💨", "🚜  💨", "🚜   "];
@@ -318,47 +215,6 @@ class FarmTerminal {
           resolve();
         }
       }, interval);
-    });
-  }
-
-  // Progress bar for multi-step operations
-  createProgressBar(options = {}) {
-    const { title = "Progress", items = 10, width = 40 } = options;
-
-    term("\n");
-    this.progressBar = term.progressBar({
-      title: `  ${emojis.tractor} ${title}`,
-      eta: true,
-      percent: true,
-      items,
-      width: Math.min(width, term.width - 20),
-      barStyle: term.green,
-      barBracketStyle: term.white,
-      percentStyle: term.yellow,
-      etaStyle: term.gray,
-    });
-
-    return this.progressBar;
-  }
-
-  updateProgress(value) {
-    if (this.progressBar) {
-      this.progressBar.update(value);
-    }
-  }
-
-  // Slow typing effect for dramatic text
-  async slowType(text, speed = 50) {
-    return new Promise((resolve) => {
-      term.slowTyping(
-        text,
-        {
-          flashStyle: term.brightWhite,
-          delay: speed,
-          style: term.green,
-        },
-        resolve,
-      );
     });
   }
 
@@ -435,16 +291,6 @@ class FarmTerminal {
   // Print tractor ASCII art
   printTractor() {
     term.green(TRACTOR_ART);
-  }
-
-  // Print small tractor
-  printSmallTractor() {
-    term.green(SMALL_TRACTOR);
-  }
-
-  // Print barn ASCII art
-  printBarn() {
-    term.yellow(BARN_ART);
   }
 
   // Display the main FARMWORK logo with fruit
@@ -539,15 +385,6 @@ class FarmTerminal {
     term("\n".repeat(count));
   }
 
-  // Raw text output
-  print(text) {
-    term(text);
-  }
-
-  // Colored text helpers
-  green(text) {
-    term.green(text);
-  }
   yellow(text) {
     term.yellow(text);
   }
@@ -563,36 +400,6 @@ class FarmTerminal {
   white(text) {
     term.white(text);
   }
-  bold(text) {
-    term.bold(text);
-  }
-
-  // Wait for keypress
-  async waitForKey(message = "Press any key to continue...") {
-    term.gray(`\n  ${message}`);
-    return new Promise((resolve) => {
-      term.grabInput(true);
-      term.once("key", (key) => {
-        term.grabInput(false);
-        term("\n");
-        resolve(key);
-      });
-    });
-  }
-
-  // Countdown animation
-  async countdown(seconds, message = "Starting in") {
-    for (let i = seconds; i > 0; i--) {
-      term.column(1);
-      term.eraseLine();
-      term.yellow(`  🐓 ${message} ${i}...`);
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-    term.column(1);
-    term.eraseLine();
-    term.green(`  🚜 Go!\n`);
-  }
-
   // Analyzing animation
   async analyzing(message = "Analyzing", durationMs = 1500) {
     const dots = ["   ", ".  ", ".. ", "..."];
@@ -626,26 +433,7 @@ class FarmTerminal {
       term.green(`    🌿 ${item}\n`);
     }
   }
-
-  // Harvest animation (gathering results)
-  async harvesting(items, message = "Harvesting") {
-    term.yellow(`\n  🌾 ${message}:\n`);
-
-    for (const item of items) {
-      await new Promise((r) => setTimeout(r, 100));
-      term.cyan(`    ${emojis.wheat} ${item}\n`);
-    }
-  }
 }
 
-// Export singleton instance and class
 export const farmTerm = new FarmTerminal();
-export {
-  FarmTerminal,
-  term,
-  colors,
-  emojis,
-  TRACTOR_ART,
-  BARN_ART,
-  SMALL_TRACTOR,
-};
+export { emojis };
