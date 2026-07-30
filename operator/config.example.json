@@ -1,0 +1,25 @@
+{
+  "farmfactory": {
+    "baseUrl": "",
+    "apiKey": ""
+  },
+  "groups": [
+    {
+      "name": "Products",
+      "description": "Things with users",
+      "farms": [
+        {
+          "name": "ExampleApp",
+          "path": "/absolute/path/to/example-app",
+          "description": "What this farm is for",
+          "slug": "example-app"
+        }
+      ]
+    },
+    {
+      "name": "Tools",
+      "description": "Internal tooling",
+      "farms": []
+    }
+  ]
+}
