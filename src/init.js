@@ -10,11 +10,9 @@ import { farmTerm, emojis } from "./terminal.js";
 function detectProjectConfig(cwd) {
   const pkgPath = path.join(cwd, "package.json");
   let pkg = {};
-  let hasPackageJson = false;
 
   try {
     pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-    hasPackageJson = true;
   } catch {
     pkg = {};
   }
@@ -40,7 +38,6 @@ function detectProjectConfig(cwd) {
     testCommand: runScript("test") || runScript("test:run") || `${packageManager} run test`,
     buildCommand: runScript("build") || `${packageManager} run build`,
     lintCommand: runScript("lint") || `${packageManager} run lint`,
-    hasPackageJson,
   };
 }
 
@@ -226,10 +223,10 @@ export async function init(options) {
       },
       { name: "Planting CLAUDE.md", fn: () => createClaudeMd(cwd, answers) },
       { name: "Growing AGENTS.md", fn: () => createAgentsMd(cwd, answers) },
-      { name: "Building FARMHOUSE.md", fn: () => createFarmhouseMd(cwd, answers) },
-      { name: "Creating the Idea Garden", fn: () => createGardenDocs(cwd, answers) },
-      { name: "Training agents", fn: () => createAgents(cwd, answers) },
-      { name: "Cultivating skills", fn: () => createSkills(cwd, answers) },
+      { name: "Building FARMHOUSE.md", fn: () => createFarmhouseMd(cwd) },
+      { name: "Creating the Idea Garden", fn: () => createGardenDocs(cwd) },
+      { name: "Training agents", fn: () => createAgents(cwd) },
+      { name: "Cultivating skills", fn: () => createSkills(cwd) },
       { name: "Setting up commands", fn: () => createCommands(cwd, answers) },
     ];
 
@@ -464,7 +461,7 @@ to ship:
   await fs.writeFile(path.join(cwd, "AGENTS.md"), content);
 }
 
-async function createFarmhouseMd(cwd, answers) {
+async function createFarmhouseMd(cwd) {
   const today = new Date().toISOString().split("T")[0];
 
   const content = `# Farmwork Farmhouse
@@ -536,7 +533,7 @@ tested, \`_PLANS/\` reflects real implementation history, and CLAUDE.md is compl
   await fs.writeFile(path.join(cwd, "_AUDIT", "FARMHOUSE.md"), content);
 }
 
-async function createGardenDocs(cwd, answers) {
+async function createGardenDocs(cwd) {
   const today = new Date().toISOString().split("T")[0];
 
   const gardenContent = `# Idea Garden
@@ -632,7 +629,7 @@ _No composted ideas yet._
   await fs.writeFile(path.join(cwd, "_AUDIT", "COMPOST.md"), compostContent);
 }
 
-async function createAgents(cwd, answers) {
+async function createAgents(cwd) {
   const agents = {
     "the-farmer.md": `---
 name: the-farmer
@@ -888,7 +885,7 @@ Confirm action taken and show updated file section.
   }
 }
 
-async function createSkills(cwd, answers) {
+async function createSkills(cwd) {
   const skills = {
     "farm-audit": {
       "SKILL.md": `---

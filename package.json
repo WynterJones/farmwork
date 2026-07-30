@@ -12,8 +12,7 @@
     "bin"
   ],
   "scripts": {
-    "test": "node --test",
-    "lint": "eslint src/"
+    "test": "node --test"
   },
   "keywords": [
     "cli",
