@@ -65,10 +65,10 @@ for dir in "$HOME/.local/bin" /usr/local/bin; do
   fi
 done
 
-# Registry - only ever created, never overwritten.
+# Registry - only ever created, never overwritten. Seeded empty rather than from
+# config.example.json, so a fresh install doesn't report a farm that isn't there.
 if [ ! -f "$OPERATOR_HOME/config.json" ]; then
-  cp "$SRC/config.example.json" "$OPERATOR_HOME/config.json"
-  chmod 600 "$OPERATOR_HOME/config.json"
+  OPERATOR_HOME="$OPERATOR_HOME" node "$BIN" init >/dev/null
   CREATED_CONFIG=1
 fi
 
