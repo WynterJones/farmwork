@@ -26,15 +26,6 @@ function countMarkdownFiles(dir) {
   }
 }
 
-function countSkills(dir) {
-  try {
-    if (!fs.existsSync(dir)) return 0;
-    return fs.readdirSync(dir).filter((f) => fs.statSync(path.join(dir, f)).isDirectory()).length;
-  } catch {
-    return 0;
-  }
-}
-
 function readAuditFile(cwd, filename) {
   const filePath = path.join(cwd, "_AUDIT", filename);
   if (!fs.existsSync(filePath)) return null;
@@ -71,13 +62,11 @@ export async function status() {
 
   const agentsDir = path.join(claudeDir, "agents");
   const commandsDir = path.join(claudeDir, "commands");
-  const skillsDir = path.join(claudeDir, "skills");
   const auditDir = path.join(cwd, "_AUDIT");
   const plansDir = path.join(cwd, "_PLANS");
 
   const agents = countMarkdownFiles(agentsDir);
   const commands = countMarkdownFiles(commandsDir);
-  const skills = countSkills(skillsDir);
   const audits = countMarkdownFiles(auditDir);
   const plans = countMarkdownFiles(plansDir);
 
@@ -85,7 +74,6 @@ export async function status() {
   farmTerm.section("Component Counts", emojis.corn);
   farmTerm.metric("Agents", agents, emojis.horse);
   farmTerm.metric("Commands", commands, emojis.bee);
-  farmTerm.metric("Skills", skills, emojis.sheep);
   farmTerm.metric("Audit Docs", audits, emojis.wheat);
   farmTerm.metric("Plans", plans, emojis.sunflower);
 
@@ -105,7 +93,6 @@ export async function status() {
     { label: "CLAUDE.md", exists: fs.existsSync(claudeMd) },
     { label: ".claude/agents/", exists: fs.existsSync(agentsDir) && agents > 0 },
     { label: ".claude/commands/", exists: fs.existsSync(commandsDir) && commands > 0 },
-    { label: ".claude/skills/", exists: fs.existsSync(skillsDir) && skills > 0 },
     { label: "_AUDIT/FARMHOUSE.md", exists: fs.existsSync(path.join(auditDir, "FARMHOUSE.md")) },
     { label: "_AUDIT/GARDEN.md", exists: fs.existsSync(path.join(auditDir, "GARDEN.md")) },
     { label: "_AUDIT/COMPOST.md", exists: fs.existsSync(path.join(auditDir, "COMPOST.md")) },
@@ -128,16 +115,19 @@ export async function status() {
     farmTerm.metric("Test Files", testFiles, emojis.potato);
   }
 
-  // ASCII Art and Phrases
+  // ASCII art + command reference
   farmTerm.nl();
   farmTerm.printTractor();
 
-  farmTerm.phrases([
-    { phrase: "open the farm", description: "Quick audit, update FARMHOUSE.md", emoji: emojis.seedling },
-    { phrase: "count the herd", description: "Deep audit: full code inspection", emoji: emojis.owl },
-    { phrase: "I have an idea for...", description: "Plant idea in GARDEN.md", emoji: emojis.herb },
-    { phrase: "water the garden", description: "Generate 10 new ideas", emoji: emojis.water },
-    { phrase: "/push", description: "Review, test, build, commit, push", emoji: emojis.tractor },
+  farmTerm.section("Commands", emojis.tractor);
+  farmTerm.commands([
+    { name: "/audit", description: "Refresh metrics, tend the Idea Garden" },
+    { name: "/inspect", description: "Audit + code review + dry-run gates" },
+    { name: "/add-idea", description: "Plant an idea in the Garden" },
+    { name: "/new-ideas", description: "Generate 10 ideas, plant the keepers" },
+    { name: "/compost", description: "Retire an idea, with a reason" },
+    { name: "/plan-idea", description: "Graduate an idea into _PLANS/" },
+    { name: "/push", description: "Clean, gate, commit, push, update metrics" },
   ]);
 
   farmTerm.gray("  Run `farmwork doctor` to check for issues.\n\n");

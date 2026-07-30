@@ -38,7 +38,7 @@ function checkClaudeMdSections(claudeMdPath) {
   }
 
   const content = fs.readFileSync(claudeMdPath, "utf8");
-  const requiredSections = ["Skills (Auto-Activate on Phrases)", "Slash Commands"];
+  const requiredSections = ["Slash Commands", "Project Configuration"];
 
   const missing = requiredSections.filter((section) => !content.includes(section));
 
@@ -112,9 +112,6 @@ export async function doctor() {
   );
   checks[1].items.push(
     checkDirectoryNotEmpty(path.join(cwd, ".claude", "commands"), "Has commands defined"),
-  );
-  checks[1].items.push(
-    checkDirectoryNotEmpty(path.join(cwd, ".claude", "skills"), "Has skills defined"),
   );
 
   // Audit System

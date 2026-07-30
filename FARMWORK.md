@@ -12,29 +12,27 @@
 ## What is Farmwork?
 
 Farmwork is an opinionated, deliberately small framework for organizing AI-assisted
-development workflows. As of 2.0.0 it provides:
+development workflows. As of 2.1.0 it provides:
 
-- **Skills** - 2 auto-activating workflows that respond to natural phrases
+- **Slash Commands** - 7 explicit workflows; nothing fires on its own
 - **Agents** - 4 focused AI agents for auditing, reviewing, cleaning, and idea tracking
-- **Slash Commands** - 1 explicit trigger, `/push`, for shipping
 - **Living Audits** - Self-updating documentation that tracks project health
 - **Plan-First Development** - Plans saved to `_PLANS/` before implementation
 - **Idea Garden** - A lightweight, no-dependency way to capture and age ideas
 
-The farming metaphor makes workflows memorable:
-- "open the farm" = quick audit of your systems (farm-audit skill)
-- "count the herd" = deep audit: quick audit + full code inspection (farm-audit skill)
-- "I have an idea for..." / "water the garden" / "compost this..." = idea lifecycle (garden skill)
+The farming metaphor names the concepts - the Farmhouse, the Garden, the Compost - but
+the commands themselves say what they do:
+- `/audit` and `/inspect` = shallow and deep passes over project health
+- `/add-idea`, `/new-ideas`, `/compost`, `/plan-idea` = the idea lifecycle
 - `/push` = review, quality gate, commit, and push
 
 Farmwork has **no external CLI dependencies**. There is no issue tracker to install, no
 task runner, and no product-strategy scaffolding to fill in - just an AI coding
 assistant and Node.js.
 
-Farmwork works with Claude Code, Codex, and Gemini CLI. Claude Code gets native
-auto-activating skills and subagents; other tools get the same workflow via
-`AGENTS.md` - a plain-instructions file since they can't invoke `.claude/skills/`
-directly.
+Farmwork works with Claude Code, Codex, and Gemini CLI. Because the commands are plain
+markdown files, Claude Code and Codex run them natively; `AGENTS.md` points any other
+tool at the same files.
 
 ---
 
@@ -44,7 +42,7 @@ directly.
 
 ```
 your-project/
-├── CLAUDE.md              # AI instructions (lean - references skills)
+├── CLAUDE.md              # AI instructions (lean - points at the commands)
 ├── AGENTS.md              # Same workflow, plain instructions for non-Claude tools
 ├── _AUDIT/                 # Living audit + idea documents
 │   ├── FARMHOUSE.md         # Framework command center / metrics
@@ -52,8 +50,6 @@ your-project/
 │   └── COMPOST.md           # Rejected ideas archive
 ├── _PLANS/                 # Implementation plans
 └── .claude/                # Claude Code configuration
-    ├── skills/
-    │   ├── farm-audit/       # "open the farm" (quick) / "count the herd" (deep)
     │   └── garden/           # idea management
     ├── agents/
     │   ├── the-farmer.md
@@ -73,37 +69,30 @@ your-project/
 
 That's it. No issue tracker, no task runner, nothing else to install.
 
-### 3. Skills (Auto-Activating Workflows)
+### 3. Slash Commands
 
-Skills are Claude Code's auto-activating workflows. They respond to natural phrases and
-handle multi-step processes. Workflow details live in `.claude/skills/[skill-name]/SKILL.md`.
+Every Farmwork workflow is an explicit slash command living in
+`.claude/commands/<name>.md`. Nothing fires on its own - there are no trigger phrases
+to memorise, and typing `/` lists the full set.
 
-#### farm-audit
-| Phrase | Mode | What Happens |
-|--------|------|---------------|
-| `open the farm` | Quick | Update `_AUDIT/FARMHOUSE.md` metrics (commands, agents, skills, tests, plans) |
-| `count the herd` | Deep | Quick audit, plus a full `code-reviewer` inspection and a dry-run of lint/test/build (no changes, no push) |
+| Command | What It Does | Delegates to |
+|---------|--------------|--------------|
+| `/audit` | Update `_AUDIT/FARMHOUSE.md` metrics and age the Idea Garden | `the-farmer` |
+| `/inspect` | `/audit`, plus a full code review and a dry run of lint/test/build | `the-farmer`, `code-reviewer` |
+| `/add-idea` | Plant a new idea in `_AUDIT/GARDEN.md` | `idea-gardener` |
+| `/new-ideas` | Generate 10 ideas from GARDEN + COMPOST context, plant the chosen ones | `idea-gardener` |
+| `/compost` | Retire an idea to `_AUDIT/COMPOST.md` with a reason | `idea-gardener` |
+| `/plan-idea` | Graduate an idea into a plan in `_PLANS/` | - |
+| `/push` | Clean, run quality gates, commit, push, update FARMHOUSE.md | `code-cleaner`, `the-farmer` |
 
-#### garden
-| Phrase | Action |
-|--------|--------|
-| `I have an idea for...` | Add new idea to `_AUDIT/GARDEN.md` |
-| `water the garden` | Generate 10 new ideas based on existing GARDEN and COMPOST |
-| `compost this...` | Move idea to `_AUDIT/COMPOST.md` with a reason |
-| `let's plan this idea...` | Graduate idea → create a plan in `_PLANS/` |
+`/audit` and `/inspect` are read-only - they never commit. Only `/push` writes to git.
 
 **Idea Lifecycle:**
 - **Fresh** (0-44 days) - Ready to develop
 - **Wilting** (45-60 days) - Needs attention ⚠️
-- **Composted** (60+ days) - Auto-moved to COMPOST during "open the farm"
+- **Composted** (60+ days) - Auto-moved to COMPOST during `/audit`
 
-### 4. Slash Commands (Explicit Actions)
-
-| Command | What It Does |
-|---------|---------------|
-| `/push` | Clean up, run `code-cleaner`, run quality gates, commit, push, update FARMHOUSE.md |
-
-### 5. Agents
+### 4. Agents
 
 | Agent | Purpose |
 |-------|---------|
@@ -112,13 +101,16 @@ handle multi-step processes. Workflow details live in `.claude/skills/[skill-nam
 | `code-cleaner` | Removes comments (except JSDoc), console.logs, and obvious dead code before pushing |
 | `idea-gardener` | Manages `_AUDIT/GARDEN.md` and `_AUDIT/COMPOST.md` idea lifecycle |
 
-### 6. AGENTS.md (Cross-Tool Support)
+### 5. AGENTS.md (Cross-Tool Support)
 
-Codex, Gemini CLI, and other AI coding assistants don't support Claude Code's native
-skills/subagents, so they can't auto-invoke `.claude/skills/`. `AGENTS.md` documents
-the same core workflow - folder structure, the "open the farm" / "count the herd"
-audit phrases, the Idea Garden phrases, and plan-first development - as plain
-instructions the assistant follows directly instead of an auto-activating skill.
+Because the commands are plain markdown, they travel. Codex reads command files
+natively - copy `.claude/commands/*.md` into `~/.codex/prompts/` and the same slash
+commands work there.
+
+For tools that read neither, `AGENTS.md` points at those same command files rather
+than restating their steps. That indirection is deliberate: the previous version
+re-documented every workflow as prose, which meant two copies of each procedure that
+had to be kept in sync by hand.
 
 ---
 
@@ -130,7 +122,7 @@ This section documents what gets created, for reference or manual setup.
 ### Step 1: Initialize Folder Structure
 
 ```bash
-mkdir -p _AUDIT _PLANS .claude/commands .claude/agents .claude/skills
+mkdir -p _AUDIT _PLANS .claude/commands .claude/agents
 ```
 
 ### Step 2: Create CLAUDE.md
@@ -140,21 +132,16 @@ Create `CLAUDE.md` in the project root with:
 ```markdown
 # Project Name
 
-## Skills (Auto-Activate on Phrases)
-
-| Phrase | Skill | What Happens |
-|--------|-------|---------------|
-| open the farm | farm-audit | Quick audit: update FARMHOUSE.md metrics |
-| count the herd | farm-audit | Deep audit: quick audit + full inspection (no changes) |
-| I have an idea for... | garden | Plant idea in GARDEN.md |
-| water the garden | garden | Generate 10 new ideas |
-| compost this... | garden | Move idea to COMPOST.md |
-| let's plan this idea... | garden | Graduate idea → create a plan in _PLANS/ |
-
 ## Slash Commands
 
 | Command | What It Does |
 |---------|---------------|
+| /audit | Refresh FARMHOUSE.md metrics and tend the Idea Garden |
+| /inspect | Audit + full code review + dry-run quality gates |
+| /add-idea | Plant a new idea in GARDEN.md |
+| /new-ideas | Generate 10 fresh ideas and plant the ones you pick |
+| /compost | Retire an idea to COMPOST.md with a reason |
+| /plan-idea | Graduate an idea into a plan in _PLANS/ |
 | /push | Clean, review, test, build, commit, push, update metrics |
 
 ## Plan Mode Protocol
@@ -193,7 +180,6 @@ Create `_AUDIT/FARMHOUSE.md`:
 |--------|-------|
 | Commands | 0 |
 | Agents | 0 |
-| Skills | 0 |
 | Unit Tests | 0 |
 | Total Plans | 0 |
 | Completed Plans | 0 |
@@ -219,7 +205,7 @@ Create `_AUDIT/FARMHOUSE.md`:
 ## Idea Lifecycle
 - Fresh (0-44 days) - Ready to develop
 - Wilting (45-60 days) - Needs attention ⚠️
-- Composted (60+ days) - Auto-moved during "open the farm"
+- Composted (60+ days) - Auto-moved during `/audit`
 
 ## Ideas
 
@@ -258,7 +244,6 @@ Maintains `_AUDIT/FARMHOUSE.md` - the living document tracking all systems and h
 
 1. Count commands: `ls -1 .claude/commands/*.md | wc -l`
 2. Count agents: `ls -1 .claude/agents/*.md | wc -l`
-3. Count skills: `ls -d .claude/skills/*/ | wc -l`
 4. Count tests: `find . -name "*.test.*" | wc -l`
 5. Count total/completed plans in `_PLANS/`
 6. Tend the Idea Garden (age-based wilting/composting)
@@ -319,7 +304,7 @@ model: opus
 
 Manages `_AUDIT/GARDEN.md` and `_AUDIT/COMPOST.md` for idea lifecycle tracking:
 plant new ideas, graduate ideas into `_PLANS/`, compost rejected ideas, and
-generate fresh ideas on request ("water the garden").
+generate fresh ideas on request (`/new-ideas`).
 ```
 
 ### Step 6: Create the Push Command
@@ -384,12 +369,12 @@ farmwork doctor
 Creating Farmwork structure...
 ✓ Created _AUDIT/
 ✓ Created _PLANS/
-✓ Created .claude/skills/, .claude/agents/, .claude/commands/
+✓ Created .claude/commands/, .claude/agents/
 ✓ Created CLAUDE.md
 ✓ Created _AUDIT/FARMHOUSE.md, GARDEN.md, COMPOST.md
 
 Farmwork initialized!
-Say "open the farm" to Claude to audit your setup.
+Run /audit in Claude Code to check your setup.
 ```
 
 There are no Storybook, i18n, or dead-code-detection questions - those setups are
@@ -407,8 +392,8 @@ For any non-trivial work:
 3. Confirm before Claude starts coding
 
 ### 2. Regular Audits
-Run "open the farm" at the start of a session to keep FARMHOUSE.md current, and
-"count the herd" before shipping something risky.
+Run `/audit` at the start of a session to keep FARMHOUSE.md current, and `/inspect`
+before shipping something risky.
 
 ### 3. Living Documents
 `_AUDIT/` files are living documents:
@@ -423,18 +408,24 @@ files. If something needs to persist, put it in `_PLANS/` or fix it immediately.
 
 ## Extending Farmwork
 
-### Adding Custom Phrases
+### Adding Custom Commands
 
-In `CLAUDE.md`, add a Project Phrases section:
+Create `.claude/commands/deploy-staging.md`:
 
 ```markdown
-### Project Phrases
+---
+description: Deploy the current branch to staging
+allowed-tools: Bash(git:*), Bash(npm:*)
+---
 
-| Phrase | Action |
-|--------|--------|
-| `deploy staging` | Deploy to staging environment |
-| `sync database` | Run database migrations |
+# Deploy Staging
+
+Steps the assistant should follow, in order.
 ```
+
+Then add a row to the command table in `CLAUDE.md` so it's documented alongside the
+built-ins. The filename becomes the command name - `deploy-staging.md` is
+`/deploy-staging`.
 
 ### Adding Custom Agents
 
@@ -457,12 +448,6 @@ What the agent does.
 Step by step instructions for the agent.
 ```
 
-### Adding Custom Skills
-
-Create `.claude/skills/your-skill/SKILL.md` with frontmatter describing the trigger
-phrases in `description`, then document the workflow in the body. Extra reference
-files in the same directory are loaded on demand (progressive disclosure).
-
 ---
 
 ## Migration Guide
@@ -473,7 +458,7 @@ Farmwork 2.0.0 is a breaking simplification release. If you're upgrading an exis
 project:
 
 1. Remove `.beads/`, `justfile`, `_OFFICE/`, and `_RESEARCH/` - they're no longer used
-2. Run `farmwork init -f` to regenerate `.claude/` with the new 4 agents / 2 skills / 1 command
+2. Run `farmwork init -f` to regenerate `.claude/` with the new 4 agents / 7 commands
 3. Merge any project-specific instructions from your old `CLAUDE.md`/`AGENTS.md` into
    the new lean `CLAUDE.md`
 4. If you relied on `SECURITY.md`, `PERFORMANCE.md`, `ACCESSIBILITY.md`,
@@ -494,7 +479,7 @@ Farmwork is designed to complement, not replace:
 
 ## Troubleshooting
 
-### Phrase commands not triggering
+### A command doesn't appear
 - Ensure `CLAUDE.md` is in the project root
 - Check phrase spelling matches exactly
 - Restart the Claude Code session
@@ -511,6 +496,28 @@ Farmwork is designed to complement, not replace:
 ---
 
 ## Changelog
+
+### 2.1.0 (2026-07-30)
+
+**Every workflow is now a slash command. Skills are gone.**
+
+- **Replaced the two skills with seven commands.** `farm-audit` and `garden` were
+  auto-activating skills triggered by phrases like "open the farm" and "water the
+  garden". Those phrases were invisible - you had to read CLAUDE.md to know they
+  existed - and the names didn't describe what they did. They're now `/audit`,
+  `/inspect`, `/add-idea`, `/new-ideas`, `/compost`, `/plan-idea`, and `/push`.
+- **`.claude/skills/` is no longer created.** `farmwork doctor` and `farmwork status`
+  no longer check or count skills, and FARMHOUSE.md drops its Skills table.
+- **`AGENTS.md` shrank by roughly half.** It used to re-document every phrase workflow
+  as prose because other tools couldn't invoke skills - two copies of each procedure,
+  kept in sync by hand. Commands are plain markdown, so it now points at the command
+  files instead. Codex can use them directly via `~/.codex/prompts/`.
+- **Added the Operator** (`operator/`) - a globally-installed skill that manages many
+  farms at once, sweeping git state across repos and tracking checklists through the
+  FarmFactory API.
+
+**Migrating:** re-run `npx farmwork init --force`, then delete `.claude/skills/`.
+Old phrases stop working; use the commands above.
 
 ### 2.0.0 (2026-07-26)
 - **Breaking simplification release.** Farmwork is cut down to "the best process that

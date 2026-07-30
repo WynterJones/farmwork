@@ -363,14 +363,11 @@ class FarmTerminal {
   }
 
   // Phrase list display
-  phrases(phraseList) {
-    term("\n");
-    term.bold.cyan("  Quick Phrases:\n\n");
-
-    for (const { phrase, description, emoji } of phraseList) {
-      term(`  ${emoji} `);
-      term.yellow.bold(phrase.padEnd(18));
-      term.gray(` ${emojis.arrow} ${description}\n`);
+  commands(commandList) {
+    for (const { name, description } of commandList) {
+      term("  ");
+      term.yellow.bold(name.padEnd(13));
+      term.gray(`${emojis.arrow} ${description}\n`);
     }
     term("\n");
   }

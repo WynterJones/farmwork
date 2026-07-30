@@ -6,7 +6,7 @@ import { status } from '../src/status.js';
 import { doctor } from '../src/doctor.js';
 import chalk from 'chalk';
 
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 
 console.log(chalk.green(`
 ╔═════════════════════════════════════╗
