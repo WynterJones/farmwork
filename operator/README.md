@@ -78,6 +78,33 @@ Or edit `~/.operator/config.json` directly:
 `slug` is optional — it's how a farm is matched to its FarmFactory checklist. Without
 it the Operator falls back to matching on name.
 
+## Keeping repos in the right org
+
+If your products belong in one GitHub organisation, declare it and the sweep will flag
+anything that drifted out:
+
+```json
+{
+  "conventions": { "expectedOrg": "MyOrg" },
+  "groups": [
+    {
+      "name": "Products",
+      "farms": [
+        { "name": "SideProject", "path": "…", "expectedOrg": null }
+      ]
+    }
+  ]
+}
+```
+
+Resolution is most-specific-first: `farm.expectedOrg` beats `group.expectedOrg` beats
+`conventions.expectedOrg`. Setting `"expectedOrg": null` on a farm opts it out, which is
+how you stop the sweep nagging about repos that legitimately live elsewhere.
+
+A drifted farm shows as `in WynterJones, expected MyOrg`. The Operator reports it and
+stops there — moving a repo is a GitHub transfer, which drops Actions secrets, deploy
+keys, webhooks and branch protection, so that stays a deliberate manual step.
+
 ## Connect FarmFactory
 
 FarmFactory runs at [factory.farmwork.dev](https://factory.farmwork.dev) - free, and part

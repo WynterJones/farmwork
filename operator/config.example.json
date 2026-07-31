@@ -1,4 +1,7 @@
 {
+  "conventions": {
+    "expectedOrg": ""
+  },
   "farmfactory": {
     "baseUrl": "https://factory.farmwork.dev",
     "apiKey": ""

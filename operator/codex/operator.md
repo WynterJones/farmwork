@@ -40,8 +40,11 @@ operator config                      resolved config, key redacted
 
 Ranked by how much a human would regret missing it: uncommitted work (the only state
 that can be lost) → unpushed commits → a registry path that no longer exists → behind
-upstream on the default branch → no `CLAUDE.md` (offer `npx farmwork init`) → a
-checklist far from complete, or a farm with no checklist. Don't flag a farm for being
+upstream on the default branch → no `CLAUDE.md` (offer `npx farmwork init`) → a repo
+sitting in the wrong GitHub org when the registry declares an `expectedOrg` → a
+checklist far from complete, or a farm with no checklist. Moving a repo between orgs is
+a GitHub transfer that drops Actions secrets, deploy keys, webhooks and branch
+protection — report the drift, never perform the transfer. Don't flag a farm for being
 idle; some farms are finished.
 
 ## With a request
@@ -71,7 +74,9 @@ every future sweep less useful. So: find the real git repos on disk, **propose**
 grouping with your reasoning, and ask them to correct it before writing anything.
 Group names encode how *they* think about their portfolio; never silently invent one
 and file repos into it. Set `slug` only when you know the FarmFactory slug — a wrong
-slug matches the wrong checklist, which is worse than the name-matching fallback. Skip
+slug matches the wrong checklist, which is worse than the name-matching fallback. If
+they keep products in one GitHub org, set `conventions.expectedOrg`; it resolves
+farm > group > conventions, and `"expectedOrg": null` on a farm opts it out. Skip
 archived or dormant repos unless told otherwise.
 
 Confirm by running `operator status` and showing them the result.

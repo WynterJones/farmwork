@@ -61,6 +61,11 @@ Rank by how much a human would regret missing it:
 - **A path that no longer exists** — the registry is stale, offer to `operator remove`.
 - **Behind upstream** on the default branch.
 - **No `CLAUDE.md`** — the farm isn't set up with Farmwork; offer `npx farmwork init`.
+- **Living in the wrong GitHub org** — if the registry declares an `expectedOrg` and the
+  farm's remote points somewhere else, `status` reports it as `in X, expected Y`. Say
+  which farms drifted and that moving them is a GitHub repo transfer, which loses
+  Actions secrets, deploy keys, webhooks and branch protection. Never transfer anything
+  yourself.
 - **A checklist far from complete**, or a farm with no checklist at all.
 - **Nothing committed in a long time** relative to that farm's own rhythm.
 
@@ -109,10 +114,15 @@ because a wrong grouping quietly makes every future sweep less useful:
    with your reasoning, and ask them to correct it. Group names encode how *they*
    think about their portfolio — "Products / Sites / Tools" may be completely wrong for
    them. Never silently invent a group and file things into it.
-3. Set `slug` only when you know the FarmFactory repo slug. A wrong slug silently
+3. If they keep products in a particular GitHub org, set `conventions.expectedOrg` so
+   the sweep flags repos that drifted out of it. It resolves most-specific-first —
+   `farm.expectedOrg` beats `group.expectedOrg` beats `conventions.expectedOrg`, and
+   `"expectedOrg": null` on a farm opts it out. Exempt the farms that legitimately live
+   elsewhere rather than letting the sweep cry wolf about them every morning.
+4. Set `slug` only when you know the FarmFactory repo slug. A wrong slug silently
    matches the wrong checklist, which is worse than no slug at all — without one the
    Operator falls back to name matching.
-4. Skip anything archived or dormant unless they say otherwise. A registry full of
+5. Skip anything archived or dormant unless they say otherwise. A registry full of
    repos they don't touch buries the farms that matter.
 
 Then confirm the result: run `operator status` and show them what it produced, so they

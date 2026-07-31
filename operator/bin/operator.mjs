@@ -48,6 +48,17 @@ function allFarms(config) {
   );
 }
 
+/**
+ * Where a farm is supposed to live on GitHub, most specific wins:
+ * farm.expectedOrg > group.expectedOrg > conventions.expectedOrg.
+ * `expectedOrg: null` on a farm opts it out of the convention entirely.
+ */
+function expectedOrgFor(config, farm, group) {
+  if (Object.hasOwn(farm, "expectedOrg")) return farm.expectedOrg;
+  if (group && Object.hasOwn(group, "expectedOrg")) return group.expectedOrg;
+  return config.conventions?.expectedOrg ?? null;
+}
+
 function findFarm(config, needle) {
   if (!needle) return null;
   const key = needle.toLowerCase();
@@ -82,6 +93,15 @@ function farmGitState(farm) {
     return { ok: false, error: "not a git repo" };
   }
 
+  const remote = git(farm.path, ["remote", "get-url", "origin"]);
+  const org = remote
+    ? remote
+        .replace(/^git@[^:]+:/, "")
+        .replace(/^https?:\/\/[^/]+\//, "")
+        .replace(/\.git$/, "")
+        .split("/")[0] || null
+    : null;
+
   const porcelain = git(farm.path, ["status", "--porcelain"]) ?? "";
   const dirty = porcelain ? porcelain.split("\n").filter(Boolean).length : 0;
   const branch = git(farm.path, ["rev-parse", "--abbrev-ref", "HEAD"]);
@@ -99,6 +119,7 @@ function farmGitState(farm) {
 
   return {
     ok: true,
+    org,
     branch,
     dirty,
     ahead,
@@ -332,14 +353,20 @@ async function cmdStatus(config, groupFilter) {
   const bySlug = new Map(checklists.filter((c) => c.repository_slug).map((c) => [c.repository_slug, c]));
   const byName = new Map(checklists.map((c) => [c.name?.toLowerCase(), c]));
 
+  const groupsByName = new Map((config.groups || []).map((g) => [g.name, g]));
+
   const rows = farms.map((farm) => {
     const checklist = bySlug.get(farm.slug) || byName.get(farm.name?.toLowerCase()) || null;
+    const git = farmGitState(farm);
+    const expectedOrg = expectedOrgFor(config, farm, groupsByName.get(farm.group));
     return {
       name: farm.name,
       group: farm.group,
       path: farm.path,
       description: farm.description || "",
-      git: farmGitState(farm),
+      expectedOrg,
+      orgDrift: Boolean(expectedOrg && git.ok && git.org && git.org !== expectedOrg),
+      git,
       checklist: checklist
         ? {
             id: checklist.id,
@@ -370,6 +397,7 @@ async function cmdStatus(config, groupFilter) {
       if (row.git.behind) flags.push(`${row.git.behind} behind`);
       if (!row.git.hasUpstream) flags.push("no upstream");
       if (!row.git.farmworkInstalled) flags.push("no CLAUDE.md");
+      if (row.orgDrift) flags.push(`in ${row.git.org}, expected ${row.expectedOrg}`);
 
       const progress = row.checklist
         ? `${bar(row.checklist.percentage)} ${String(row.checklist.percentage).padStart(3)}%`
