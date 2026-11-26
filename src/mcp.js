@@ -10,6 +10,8 @@ import {
   computeHealth,
   runAudit,
   runGates,
+  runSecurityScan,
+  savePillarAudit,
   parseGarden,
   parseCompost,
   plantIdea,
@@ -70,14 +72,45 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
     "farmwork_audit",
     {
       description:
-        "Run a deterministic Farmwork audit on a v3 repo: ages the Idea Garden (45-60d wilting, >60d auto-compost) and refreshes _AUDIT/FARMHOUSE.md. Never modifies legacy v1/v2 repos.",
+        "Run a deterministic Farmwork audit (default: ages Idea Garden and refreshes _AUDIT/FARMHOUSE.md). Optionally pass `pillar` ('security' | 'performance' | 'accessibility' | 'code-quality') to save a structured lazy pillar report to _AUDIT/<PILLAR>.md (or run a deterministic security scan when pillar='security' without a score). Never modifies legacy v1/v2 repos.",
       inputSchema: {
         projectPath: z.string().optional().describe("Path to the project directory (defaults to server cwd)"),
+        pillar: z
+          .enum(["security", "performance", "accessibility", "code-quality"])
+          .optional()
+          .describe("Optional pillar audit to run/save lazily to _AUDIT/<PILLAR>.md"),
+        score: z.number().min(0).max(10).optional().describe("Pillar score (0-10) when saving a pillar audit"),
+        status: z.string().optional().describe("Short status label for the pillar audit"),
+        summary: z.string().optional().describe("Executive summary for the pillar audit"),
+        findings: z
+          .array(
+            z.object({
+              severity: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
+              title: z.string(),
+              location: z.string().optional(),
+              detail: z.string().optional(),
+              fix: z.string().optional(),
+            }),
+          )
+          .optional()
+          .describe("Structured findings list when saving a pillar audit"),
+        recommendations: z.array(z.string()).optional().describe("Ordered recommendations when saving a pillar audit"),
       },
     },
-    async ({ projectPath }) => {
+    async ({ projectPath, pillar, score, status, summary, findings, recommendations }) => {
       try {
-        return jsonResult(runAudit(resolveDir(projectPath)));
+        const dir = resolveDir(projectPath);
+        if (pillar) {
+          if (typeof score === "number") {
+            const saved = savePillarAudit(dir, { pillar, score, status, summary, findings, recommendations });
+            return jsonResult({ saved, securityScan: pillar === "security" ? runSecurityScan(dir) : undefined });
+          }
+          if (pillar === "security") {
+            return jsonResult(runSecurityScan(dir));
+          }
+          return errorResult(`Provide a numeric \`score\` (0-10) to save a "${pillar}" pillar audit.`);
+        }
+        return jsonResult(runAudit(dir));
       } catch (err) {
         return errorResult(err);
       }
@@ -88,13 +121,13 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
     "farmwork_gates",
     {
       description:
-        "Run the repository's configured quality gates (lint, test, build), record verified results for v3 repos, and return structured pass/fail output.",
+        "Run the repository's configured quality gates (lint, test, build, and local secrets security check), record verified results for v3 repos, and return structured pass/fail output.",
       inputSchema: {
         projectPath: z.string().optional().describe("Path to the project directory (defaults to server cwd)"),
         only: z
-          .array(z.enum(["lint", "test", "build"]))
+          .array(z.enum(["lint", "test", "build", "security"]))
           .optional()
-          .describe("Optional subset of gates to run (defaults to all configured gates)"),
+          .describe("Optional subset of gates to run (defaults to lint, test, build, security)"),
       },
     },
     async ({ projectPath, only }) => {
@@ -246,14 +279,46 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
 
   server.registerPrompt(
     "inspect",
-    { description: "Deep read-only review: run quality gates plus code, security, performance, and accessibility review." },
+    { description: "Deep review: run quality gates + security scan, review security/performance/accessibility, and optionally persist pillar scores." },
     () => ({
       messages: [
         {
           role: "user",
           content: {
             type: "text",
-            text: "Run `farmwork_status` and `farmwork_gates`. Then perform a thorough read-only code review covering correctness, security (OWASP), performance, maintainability, and accessibility. Report findings inline by severity (CRITICAL / HIGH / MEDIUM / LOW) with exact file:line references and concrete fixes. Do not edit or commit files.",
+            text: "Run `farmwork_status`, `farmwork_gates`, and `farmwork_audit` with `pillar: \"security\"`. Then perform a thorough read-only code review covering Security (OWASP), Performance, Accessibility, and Code Quality. Report findings by severity (CRITICAL / HIGH / MEDIUM / LOW) with exact file:line references and concrete fixes, and offer to save any pillar report via `farmwork_audit` (`pillar`, `score`, `findings`).",
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "security",
+    { description: "Run deterministic secrets/dependency scan + OWASP review and save _AUDIT/SECURITY.md." },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: "Call `farmwork_audit` with `pillar: \"security\"` (no score yet) to run the deterministic secrets and dependency vulnerability scan. Then audit the codebase for OWASP Top 10 risks (auth, injection/XSS, secrets, access control, SSRF, headers). Save the structured findings and honest 0-10 score to `_AUDIT/SECURITY.md` by calling `farmwork_audit` with `pillar: \"security\"`, `score`, `summary`, `findings`, and `recommendations`.",
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    "performance",
+    { description: "Audit runtime speed, queries, bundle size, and rendering, then save _AUDIT/PERFORMANCE.md." },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: "Inspect this codebase for performance bottlenecks (N+1 queries, missing indexes, heavy bundles, blocking I/O, unnecessary re-renders, memory leaks). Save the structured findings and honest 0-10 score to `_AUDIT/PERFORMANCE.md` using `farmwork_audit` (`pillar: \"performance\"`, `score`, `summary`, `findings`, `recommendations`).",
           },
         },
       ],

@@ -14,6 +14,9 @@ import {
   computeHealth,
   runAudit,
   runGates,
+  runSecurityScan,
+  parsePillarAudits,
+  savePillarAudit,
   plantIdea,
   compostIdea,
   parseGarden,
@@ -230,7 +233,7 @@ test("MCP server speaks valid JSON-RPC over stdio with zero stdout banner pollut
   });
   const initResp = await waitForId(1);
   assert.equal(initResp.result.serverInfo.name, "farmwork");
-  assert.equal(initResp.result.serverInfo.version, "3.0.0");
+  assert.equal(initResp.result.serverInfo.version, "3.1.0");
 
   send({ jsonrpc: "2.0", method: "notifications/initialized" });
   send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
@@ -278,6 +281,37 @@ test("MCP server speaks valid JSON-RPC over stdio with zero stdout banner pollut
   const planResp = await waitForId(5);
   const planned = JSON.parse(planResp.result.content[0].text);
   assert.equal(planned.graduated, true);
+
+  // Pillar audit via MCP farmwork_audit (deterministic security scan + lazy performance report)
+  send({
+    jsonrpc: "2.0",
+    id: 6,
+    method: "tools/call",
+    params: { name: "farmwork_audit", arguments: { pillar: "security" } },
+  });
+  const secResp = await waitForId(6);
+  const secScan = JSON.parse(secResp.result.content[0].text);
+  assert.equal(secScan.passed, true);
+
+  send({
+    jsonrpc: "2.0",
+    id: 7,
+    method: "tools/call",
+    params: {
+      name: "farmwork_audit",
+      arguments: {
+        pillar: "performance",
+        score: 8.6,
+        status: "Fast",
+        summary: "Bundle and queries look lean.",
+        findings: [{ severity: "LOW", title: "Lazy-load chart module", location: "src/App.jsx:12" }],
+      },
+    },
+  });
+  const perfResp = await waitForId(7);
+  const perfSaved = JSON.parse(perfResp.result.content[0].text);
+  assert.equal(perfSaved.saved.path, "_AUDIT/PERFORMANCE.md");
+  assert.equal(perfSaved.saved.score, 8.6);
 
   child.kill();
   fs.removeSync(dir);
@@ -442,4 +476,59 @@ test("legacy v1/v2 Farmwork repos are never auto-updated and require explicit --
   assert.ok(mergedMcp.mcpServers.farmwork);
 
   fs.removeSync(workspace);
+});
+
+test("deterministic security scan detects leaked secrets and lazy pillar audits persist cleanly", async () => {
+  const dir = makeTempDir("fw-sec-");
+  fs.writeJsonSync(path.join(dir, "package.json"), { name: "sec-demo" });
+  initProject(dir);
+
+  // No pillar audit files created eagerly on init
+  assert.equal(fs.existsSync(path.join(dir, "_AUDIT", "SECURITY.md")), false);
+  assert.equal(parsePillarAudits(dir).every((p) => !p.exists), true);
+
+  // Clean repo passes security scan (even with .env.example present)
+  fs.writeFileSync(path.join(dir, ".env.example"), "API_KEY=replace-me\n");
+  const cleanScan = runSecurityScan(dir, { skipDeps: true });
+  assert.equal(cleanScan.passed, true);
+  assert.equal(cleanScan.secretFindings.length, 0);
+
+  // Introduce a committed .env and a hardcoded AWS key -> must flag both
+  fs.writeFileSync(path.join(dir, ".env"), "SECRET=123\n");
+  fs.writeFileSync(path.join(dir, "leak.js"), "const key = 'AKIA1234567890ABCDEF';\n");
+  const dirtyScan = runSecurityScan(dir, { skipDeps: true });
+  assert.equal(dirtyScan.passed, false);
+  assert.ok(dirtyScan.secretFindings.some((f) => f.file === ".env"));
+  assert.ok(dirtyScan.secretFindings.some((f) => f.file === "leak.js" && f.type === "AWS Access Key"));
+
+  // Save a lazy pillar audit and verify history + computeHealth().pillars
+  const saved = savePillarAudit(dir, {
+    pillar: "security",
+    score: 7.5,
+    status: "Hardened",
+    summary: "Removed leaked key and added CSP.",
+    findings: [{ severity: "HIGH", title: "Missing CSP header", location: "server.js:14", fix: "Add CSP middleware" }],
+    recommendations: ["Enable strict CSP in production"],
+  });
+  assert.equal(saved.path, "_AUDIT/SECURITY.md");
+  const health = computeHealth(dir);
+  const secPillar = health.pillars.find((p) => p.key === "security");
+  assert.equal(secPillar.exists, true);
+  assert.equal(secPillar.score, 7.5);
+
+  // Viewer /api/security endpoint works
+  const server = createViewerServer(dir);
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  const secRes = await fetch(`http://127.0.0.1:${port}/api/security`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: dir, skipDeps: true }),
+  });
+  assert.equal(secRes.status, 200);
+  const secJson = await secRes.json();
+  assert.equal(secJson.passed, false);
+
+  server.close();
+  fs.removeSync(dir);
 });

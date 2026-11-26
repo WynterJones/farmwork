@@ -2,7 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { execSync, spawnSync } from "child_process";
 
-export const VERSION = "3.0.0";
+export const VERSION = "3.1.0";
 
 const IGNORED_DIRS = new Set([
   "node_modules",
@@ -36,12 +36,50 @@ const TEST_FILE_PATTERNS = [
 ];
 
 const LEGACY_V1_AUDIT_FILES = [
-  "SECURITY.md",
-  "PERFORMANCE.md",
-  "ACCESSIBILITY.md",
-  "CODE_QUALITY.md",
   "KNIP.md",
   "TESTS.md",
+];
+
+export const PILLAR_AUDITS = {
+  security: {
+    key: "security",
+    file: "SECURITY.md",
+    title: "Security Audit",
+    description: "OWASP posture, secrets hygiene, and dependency vulnerabilities",
+  },
+  performance: {
+    key: "performance",
+    file: "PERFORMANCE.md",
+    title: "Performance Audit",
+    description: "Speed, bundle size, queries, rendering, and runtime efficiency",
+  },
+  accessibility: {
+    key: "accessibility",
+    file: "ACCESSIBILITY.md",
+    title: "Accessibility Audit",
+    description: "WCAG 2.1 AA semantics, keyboard navigation, and contrast",
+  },
+  "code-quality": {
+    key: "code-quality",
+    file: "CODE_QUALITY.md",
+    title: "Code Quality Audit",
+    description: "Architecture, maintainability, error handling, and dead code",
+  },
+};
+
+const SENSITIVE_TRACKED_FILE_PATTERNS = [
+  { label: "Committed .env file", re: /(^|\/)\.env(\.(local|prod|production|staging|dev|development))?$/i },
+  { label: "Private key or certificate", re: /\.(pem|p12|pfx|key|jks)$/i },
+  { label: "SSH private key", re: /(^|\/)id_(rsa|ed25519|ecdsa|dsa)$/i },
+];
+
+const SECRET_PATTERNS = [
+  { label: "AWS Access Key", re: /\bAKIA[0-9A-Z]{16}\b/ },
+  { label: "GitHub Token", re: /\bgh[pousr]_[A-Za-z0-9]{20,}\b/ },
+  { label: "OpenAI / Anthropic API Key", re: /\bsk-(?:proj-|ant-api\d+-)?[A-Za-z0-9_-]{24,}\b/ },
+  { label: "Stripe Live Secret Key", re: /\bsk_live_[A-Za-z0-9]{16,}\b/ },
+  { label: "Slack Token", re: /\bxox[baprs]-[0-9A-Za-z-]{10,}\b/ },
+  { label: "Private Key Block", re: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/ },
 ];
 
 export class LegacyFarmworkError extends Error {
@@ -1054,6 +1092,7 @@ export function computeHealth(cwd, { assumeFarmhouse = false } = {}) {
     score,
     status,
     breakdown,
+    pillars: parsePillarAudits(dir),
     metrics: {
       testFiles,
       totalPlans: plans.length,
@@ -1173,13 +1212,362 @@ ${trimmedHistory}
   return { health, gardenResult, farmhousePath };
 }
 
+/* ============================================================================
+   Lazy Pillar Audits (Security, Performance, Accessibility, Code Quality)
+   & Deterministic Security Scan
+   ============================================================================ */
+
+export function parsePillarAudits(cwd) {
+  const dir = resolveProjectPath(cwd);
+  return Object.values(PILLAR_AUDITS).map((meta) => {
+    const relPath = `_AUDIT/${meta.file}`;
+    const full = path.join(dir, relPath);
+    if (!fs.existsSync(full)) {
+      return {
+        key: meta.key,
+        file: meta.file,
+        path: relPath,
+        title: meta.title,
+        description: meta.description,
+        exists: false,
+        score: null,
+        status: null,
+        lastUpdated: null,
+      };
+    }
+    const content = fs.readFileSync(full, "utf8");
+    const scoreMatch = content.match(/\*\*Score:\*\*\s*([\d.]+)\s*\/\s*10/i);
+    const statusMatch = content.match(/\*\*Status:\*\*\s*(.+)/i);
+    const updatedMatch = content.match(/\*\*Last Updated:\*\*\s*(\d{4}-\d{2}-\d{2})/i);
+    return {
+      key: meta.key,
+      file: meta.file,
+      path: relPath,
+      title: meta.title,
+      description: meta.description,
+      exists: true,
+      score: scoreMatch ? Number(scoreMatch[1]) : null,
+      status: statusMatch ? statusMatch[1].trim() : "Audited",
+      lastUpdated: updatedMatch ? updatedMatch[1] : null,
+    };
+  });
+}
+
+export function savePillarAudit(
+  cwd,
+  { pillar, score, status = "Audited", summary = "", findings = [], recommendations = [] },
+) {
+  const dir = resolveProjectPath(cwd);
+  assertWritableV3(dir);
+
+  const key = String(pillar || "").trim().toLowerCase();
+  const meta = PILLAR_AUDITS[key];
+  if (!meta) {
+    throw new Error(`Unknown pillar "${pillar}". Use: ${Object.keys(PILLAR_AUDITS).join(", ")}.`);
+  }
+
+  const numScore = Number(score);
+  if (Number.isNaN(numScore) || numScore < 0 || numScore > 10) {
+    throw new Error("Score must be a number between 0 and 10.");
+  }
+  const roundedScore = Number(numScore.toFixed(1));
+  const today = todayISO();
+  const relPath = `_AUDIT/${meta.file}`;
+  const fullPath = path.join(dir, relPath);
+
+  let existingHistoryRows = [];
+  if (fs.existsSync(fullPath)) {
+    const prev = fs.readFileSync(fullPath, "utf8");
+    const histMatch = prev.match(/## Audit History\s*\n([\s\S]*)$/);
+    if (histMatch) {
+      existingHistoryRows = histMatch[1]
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith("|") && !l.includes("---") && !l.toLowerCase().includes("| date |"));
+    }
+  }
+
+  const cleanFindings = Array.isArray(findings) ? findings : [];
+  const findingsMd =
+    cleanFindings.length === 0
+      ? "_No open issues recorded._"
+      : cleanFindings
+          .map((f) => {
+            if (typeof f === "string") return `- ${f}`;
+            const sev = String(f.severity || "MEDIUM").toUpperCase();
+            const loc = f.location ? ` (\`${f.location}\`)` : "";
+            const fix = f.fix ? ` — **Fix:** ${f.fix}` : "";
+            return `- **[${sev}]** ${f.title || f.detail || "Finding"}${loc}${f.detail && f.title ? `: ${f.detail}` : ""}${fix}`;
+          })
+          .join("\n");
+
+  const recsMd =
+    Array.isArray(recommendations) && recommendations.length > 0
+      ? recommendations.map((r) => `- ${r}`).join("\n")
+      : "- _Keep gates green and re-audit after major architecture changes._";
+
+  const newRow = `| ${today} | Score ${roundedScore}/10 · ${plural(cleanFindings.length, "finding")} · ${status} |`;
+  const historyRows = existingHistoryRows[0] === newRow ? existingHistoryRows : [newRow, ...existingHistoryRows];
+  const trimmedHistory = historyRows.slice(0, 15).join("\n");
+
+  const project = detectProject(dir);
+  const content = `# ${meta.title} — ${project.projectName}
+
+> ${meta.description}
+
+**Last Updated:** ${today}
+**Score:** ${roundedScore}/10
+**Status:** ${status}
+
+---
+
+## Executive Summary
+
+${summary || "_Audit completed via Farmwork v3._"}
+
+---
+
+## Findings
+
+${findingsMd}
+
+---
+
+## Recommendations
+
+${recsMd}
+
+---
+
+## Audit History
+
+| Date | Summary |
+|------|---------|
+${trimmedHistory}
+`;
+
+  fs.ensureDirSync(path.join(dir, "_AUDIT"));
+  fs.writeFileSync(fullPath, content);
+
+  return {
+    saved: true,
+    pillar: meta.key,
+    path: relPath,
+    score: roundedScore,
+    status,
+    findingsCount: cleanFindings.length,
+  };
+}
+
+function listFilesForSecurityScan(dir) {
+  if (fs.existsSync(path.join(dir, ".git"))) {
+    try {
+      const out = execSync("git ls-files", {
+        cwd: dir,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        maxBuffer: 1024 * 1024 * 4,
+      }).trim();
+      if (out) return out.split("\n").filter(Boolean);
+    } catch {
+      // fall through to filesystem walk
+    }
+  }
+
+  const files = [];
+  function walk(current, relBase, depth) {
+    if (depth > 6 || files.length > 1500) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (IGNORED_DIRS.has(entry.name)) continue;
+      const rel = relBase ? `${relBase}/${entry.name}` : entry.name;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full, rel, depth + 1);
+      } else if (entry.isFile()) {
+        files.push(rel);
+      }
+    }
+  }
+  walk(dir, "", 0);
+  return files;
+}
+
+const SKIP_SECRET_CONTENT_EXT = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|eot|pdf|zip|gz|tar|mp3|mp4|mov|sqlite|db|lock)$/i;
+
+export function runSecurityScan(cwd, { skipDeps = false, timeoutMs = 30000 } = {}) {
+  const dir = resolveProjectPath(cwd);
+  const project = detectProject(dir);
+  const files = listFilesForSecurityScan(dir);
+  const secretFindings = [];
+  let filesScanned = 0;
+
+  for (const rel of files) {
+    const base = path.basename(rel);
+    // 1. Flag sensitive tracked files (.env, private keys) while allowing .env.example / .env.sample / .env.template
+    if (!/\.(example|sample|template)$/i.test(base)) {
+      for (const pat of SENSITIVE_TRACKED_FILE_PATTERNS) {
+        if (pat.re.test(rel)) {
+          secretFindings.push({
+            severity: "CRITICAL",
+            type: pat.label,
+            file: rel,
+            line: null,
+            detail: "Remove from git history/tracking and add to .gitignore",
+          });
+        }
+      }
+    }
+
+    if (SKIP_SECRET_CONTENT_EXT.test(rel) || base === "package-lock.json" || base === "pnpm-lock.yaml" || base === "yarn.lock") {
+      continue;
+    }
+
+    const full = path.join(dir, rel);
+    let stat;
+    try {
+      stat = fs.statSync(full);
+    } catch {
+      continue;
+    }
+    if (!stat.isFile() || stat.size > 256 * 1024) continue;
+
+    let text;
+    try {
+      text = fs.readFileSync(full, "utf8");
+    } catch {
+      continue;
+    }
+    if (text.includes("\u0000")) continue; // binary file
+    filesScanned++;
+
+    const lines = text.split("\n");
+    for (let idx = 0; idx < lines.length; idx++) {
+      const line = lines[idx];
+      for (const pat of SECRET_PATTERNS) {
+        if (pat.re.test(line)) {
+          secretFindings.push({
+            severity: "CRITICAL",
+            type: pat.label,
+            file: rel,
+            line: idx + 1,
+            detail: "Possible hardcoded secret detected (value redacted)",
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // 2. Stack dependency / static security audit (best-effort; skips cleanly if tool/lockfile absent)
+  let dependencyAudit = { status: "skipped", tool: null, command: null, durationMs: 0, reason: "Skipped" };
+
+  if (!skipDeps) {
+    let tool = null;
+    let command = null;
+
+    if (fs.existsSync(path.join(dir, "package-lock.json"))) {
+      tool = "npm audit";
+      command = "npm audit --omit=dev --audit-level=high";
+    } else if (fs.existsSync(path.join(dir, "bin", "brakeman"))) {
+      tool = "brakeman";
+      command = "bin/brakeman -q --no-pager";
+    } else if (fs.existsSync(path.join(dir, "Cargo.lock"))) {
+      const hasCargoAudit = spawnSync("cargo", ["audit", "--version"], { stdio: "ignore" }).status === 0;
+      if (hasCargoAudit) {
+        tool = "cargo audit";
+        command = "cargo audit";
+      }
+    } else if (fs.existsSync(path.join(dir, "pyproject.toml")) || fs.existsSync(path.join(dir, "requirements.txt"))) {
+      const hasPipAudit = spawnSync("pip-audit", ["--version"], { stdio: "ignore" }).status === 0;
+      if (hasPipAudit) {
+        tool = "pip-audit";
+        command = "pip-audit";
+      }
+    }
+
+    if (!command) {
+      dependencyAudit = {
+        status: "skipped",
+        tool: null,
+        command: null,
+        durationMs: 0,
+        reason: "No supported lockfile or security scanner detected (npm audit / brakeman / cargo-audit / pip-audit)",
+      };
+    } else {
+      const start = Date.now();
+      const res = spawnSync(command, {
+        cwd: dir,
+        shell: true,
+        encoding: "utf8",
+        timeout: timeoutMs,
+        maxBuffer: 1024 * 1024 * 4,
+      });
+      const durationMs = Date.now() - start;
+      const combined = `${res.stdout || ""}\n${res.stderr || ""}`.trim();
+      const tail = combined.split("\n").slice(-30).join("\n");
+
+      // Treat offline/network errors on npm audit gracefully as skipped rather than a false vulnerability
+      if (res.status !== 0 && /ENOTFOUND|EAI_AGAIN|ETIMEDOUT|network/i.test(combined)) {
+        dependencyAudit = {
+          status: "skipped",
+          tool,
+          command,
+          durationMs,
+          reason: `${tool} skipped (offline / registry unreachable)`,
+        };
+      } else {
+        dependencyAudit = {
+          status: res.status === 0 ? "passed" : "failed",
+          tool,
+          command,
+          durationMs,
+          output: tail,
+        };
+      }
+    }
+  }
+
+  const passed = secretFindings.length === 0 && dependencyAudit.status !== "failed";
+  return {
+    projectName: project.projectName,
+    stack: project.stack,
+    passed,
+    filesScanned,
+    secretFindings,
+    dependencyAudit,
+  };
+}
+
 export function runGates(cwd, { only = null, timeoutMs = 120000 } = {}) {
   const dir = resolveProjectPath(cwd);
   const project = detectProject(dir);
-  const gateNames = Array.isArray(only) && only.length > 0 ? only : ["lint", "test", "build"];
+  const gateNames = Array.isArray(only) && only.length > 0 ? only : ["lint", "test", "build", "security"];
 
   const results = [];
   for (const name of gateNames) {
+    if (name === "security") {
+      const start = Date.now();
+      const scan = runSecurityScan(dir, { skipDeps: true });
+      const durationMs = Date.now() - start;
+      results.push({
+        gate: "security",
+        status: scan.passed ? "passed" : "failed",
+        exitCode: scan.passed ? 0 : 1,
+        command: "farmwork security --skip-deps",
+        durationMs,
+        output: scan.passed
+          ? `Scanned ${scan.filesScanned} files — 0 secrets/sensitive files found`
+          : scan.secretFindings.map((f) => `[${f.severity}] ${f.type}: ${f.file}${f.line ? `:${f.line}` : ""}`).join("\n"),
+      });
+      continue;
+    }
+
     const cmd = project.commands[name];
     if (!cmd) {
       results.push({ gate: name, status: "skipped", command: null, durationMs: 0, output: "No command configured" });

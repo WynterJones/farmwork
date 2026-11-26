@@ -61,9 +61,9 @@ Or in **Gemini CLI** (`~/.gemini/settings.json`) / **Codex** (`~/.codex/config.t
 
 | Tool | What It Does |
 |---|---|
-| `farmwork_status` | Deterministic health score (0–10), stack, polyglot test count, verified gate status, checklist %, garden, plans, git state |
-| `farmwork_audit` | Age Idea Garden (45d wilting, >60d auto-compost) and refresh `_AUDIT/FARMHOUSE.md` |
-| `farmwork_gates` | Run detected `lint`, `test`, and `build` commands, save verified results, and return structured pass/fail output |
+| `farmwork_status` | Deterministic health score (0–10), pillar scores, stack, polyglot test count, verified gate status, checklist %, garden, plans, git state |
+| `farmwork_audit` | Age Idea Garden & refresh `_AUDIT/FARMHOUSE.md`, OR run/save lazy pillar audits (`security`, `performance`, `accessibility`, `code-quality`) |
+| `farmwork_gates` | Run detected `lint`, `test`, `build`, and local `security` secrets check, saving verified results |
 | `farmwork_checklist` | Read or idempotently `complete`, `pending`, `skip`, or `add` items in `_AUDIT/CHECKLIST.md` |
 | `farmwork_garden` | `list`, `plant`, or `compost` pre-plan ideas in `_AUDIT/GARDEN.md` (lazily creates `_AUDIT/COMPOST.md`) |
 | `farmwork_plan` | `list`, `create` (graduates linked garden ideas), or `complete` plans in `_PLANS/` |
@@ -75,8 +75,8 @@ Or in **Gemini CLI** (`~/.gemini/settings.json`) / **Codex** (`~/.codex/config.t
 - `farmwork://garden` — `_AUDIT/GARDEN.md`
 - `farmwork://compost` — `_AUDIT/COMPOST.md`
 
-### 5 Workflow Prompts
-`audit`, `inspect`, `plan`, `new-ideas`, and `ship` — exposed natively via MCP so you never copy-paste slash-command files across tools.
+### 7 Workflow Prompts
+`audit`, `inspect`, `security`, `performance`, `plan`, `new-ideas`, and `ship` — exposed natively via MCP so you never copy-paste slash-command files across tools.
 
 ---
 
@@ -101,13 +101,14 @@ your-project/
 ## CLI Reference
 
 ```bash
-farmwork init [-f] [-y] [--reinstall] [--no-mcp]  # Set up Farmwork v3 in current repo
-farmwork mcp [--cwd <path>]                       # Run MCP server over stdio
-farmwork view [path] [-p 4174]                    # Open Local Farm Viewer (1 repo or folder of repos)
-farmwork status [--json]                          # Deterministic health score & metrics
-farmwork audit [--json]                           # Refresh FARMHOUSE.md & tend Idea Garden
-farmwork gates [--only lint,test]                 # Run quality gates
-farmwork doctor [--json]                          # Diagnose configuration issues
+farmwork init [-f] [-y] [--reinstall] [--npx] [--no-mcp]  # Set up Farmwork v3 in current repo
+farmwork mcp [--cwd <path>]                               # Run MCP server over stdio
+farmwork view [path] [-p 4174]                            # Open Local Farm Viewer (1 repo or folder of repos)
+farmwork status [--json]                                  # Deterministic health score & pillar scores
+farmwork audit [--json]                                   # Refresh FARMHOUSE.md & tend Idea Garden
+farmwork gates [--only lint,test,build,security]          # Run quality & security gates
+farmwork security [--skip-deps] [--json]                  # Deterministic secrets & dependency vulnerability scan
+farmwork doctor [--json]                                  # Diagnose configuration issues
 ```
 
 ---

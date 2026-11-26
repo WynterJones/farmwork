@@ -1,6 +1,28 @@
-import inquirer from "inquirer";
+import readline from "node:readline/promises";
 import { VERSION, detectFarmworkInstall, detectProject, initProject } from "./core.js";
 import { farmTerm, emojis } from "./terminal.js";
+
+async function askConfirm(question, defaultYes = true) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const hint = defaultYes ? "[Y/n]" : "[y/N]";
+    const ans = (await rl.question(`  ${question} ${hint} `)).trim().toLowerCase();
+    if (!ans) return defaultYes;
+    return ans === "y" || ans === "yes";
+  } finally {
+    rl.close();
+  }
+}
+
+async function askInput(question, defaultValue) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const ans = (await rl.question(`  ${question} (${defaultValue}): `)).trim();
+    return ans || defaultValue;
+  } finally {
+    rl.close();
+  }
+}
 
 export async function init(options = {}) {
   const cwd = process.cwd();
@@ -45,21 +67,14 @@ export async function init(options = {}) {
 
   if (isInteractive) {
     console.log("");
-    const { ok } = await inquirer.prompt([
-      {
-        type: "confirm",
-        name: "ok",
-        message: options.reinstall
-          ? "Reinstall Farmwork v3 with these settings?"
-          : "Initialize Farmwork v3 with these settings?",
-        default: true,
-      },
-    ]);
+    const ok = await askConfirm(
+      options.reinstall
+        ? "Reinstall Farmwork v3 with these settings?"
+        : "Initialize Farmwork v3 with these settings?",
+      true,
+    );
     if (!ok) {
-      const answer = await inquirer.prompt([
-        { type: "input", name: "projectName", message: "Project name:", default: projectName },
-      ]);
-      projectName = answer.projectName;
+      projectName = await askInput("Project name", projectName);
     }
   }
 

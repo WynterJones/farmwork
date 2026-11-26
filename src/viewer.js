@@ -16,6 +16,7 @@ import {
   readFarmDocs,
   runAudit,
   runGates,
+  runSecurityScan,
   setChecklistItem,
   addChecklistItem,
   plantIdea,
@@ -34,6 +35,10 @@ const ALLOWED_ASSETS = new Set([
   "audit-garden.webp",
   "audit-compost.webp",
   "audit-tests.webp",
+  "audit-security.webp",
+  "audit-performance.webp",
+  "audit-accessibility.webp",
+  "audit-code-quality.webp",
   "main-bg.webp",
 ]);
 
@@ -199,6 +204,17 @@ export function createViewerServer(rootDir) {
           return;
         }
         sendJson(res, 200, runGates(target, { only: body.only }));
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/security") {
+        const body = await readBody(req);
+        const target = body.path || resolvedRoot;
+        if (!isWithinRoot(resolvedRoot, target)) {
+          sendJson(res, 403, { error: "Path outside viewer root" });
+          return;
+        }
+        sendJson(res, 200, runSecurityScan(target, { skipDeps: Boolean(body.skipDeps) }));
         return;
       }
 
@@ -1690,6 +1706,7 @@ const VIEWER_HTML = `<!doctype html>
       tab: "overview", // "overview" | "checklists" | "ideas" | "plans" | "docs"
       docPath: null,
       gateResult: null,
+      securityResult: null,
       filterText: "",
       filterGen: "all", // "all" | "v3" | "legacy"
       prosePx: 15,
@@ -1834,6 +1851,10 @@ const VIEWER_HTML = `<!doctype html>
     function docArtForPath(p) {
       const low = String(p || "").toLowerCase();
       if (low.includes("farmhouse")) return "/assets/audit-farmhouse.webp";
+      if (low.includes("security")) return "/assets/audit-security.webp";
+      if (low.includes("perform")) return "/assets/audit-performance.webp";
+      if (low.includes("accessib")) return "/assets/audit-accessibility.webp";
+      if (low.includes("code_quality") || low.includes("code-quality")) return "/assets/audit-code-quality.webp";
       if (low.includes("garden")) return "/assets/audit-garden.webp";
       if (low.includes("compost")) return "/assets/audit-compost.webp";
       if (low.includes("test") || low.includes("checklist")) return "/assets/audit-tests.webp";
@@ -2106,6 +2127,42 @@ const VIEWER_HTML = `<!doctype html>
       \`;
     }
 
+    function renderSecurityPanel() {
+      if (!state.securityResult) return "";
+      const s = state.securityResult;
+      return \`
+        <div class="surface animate-in" style="padding:1.25rem 1.4rem;margin-block-end:1.5rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-block-end:0.85rem">
+            <h3 style="font-size:0.95rem">Security Scan (\${s.filesScanned} files scanned)</h3>
+            <span class="badge \${s.passed ? "badge-success" : "badge-error"}">\${s.passed ? "Clean" : "Issues Found"}</span>
+          </div>
+          \${s.secretFindings.length === 0
+            ? '<div class="gate-row"><div class="gate-row-top"><span><span style="color:var(--sage-200)">✓</span> <strong style="margin-inline-start:0.35rem;color:var(--latte-100)">Secrets &amp; Sensitive Files</strong></span><span style="color:var(--latte-500)">0 findings</span></div></div>'
+            : s.secretFindings.map((f) => \`
+              <div class="gate-row">
+                <div class="gate-row-top">
+                  <span><span style="color:var(--clay-200)">✗</span> <strong style="margin-inline-start:0.35rem;color:var(--clay-100)">\${esc(f.type)}</strong> <code style="margin-inline-start:0.4rem">\${esc(f.file)}\${f.line ? ":" + f.line : ""}</code></span>
+                  <span class="badge badge-error">\${esc(f.severity)}</span>
+                </div>
+              </div>
+            \`).join("")}
+          <div class="gate-row">
+            <div class="gate-row-top">
+              <span>
+                <span style="color:\${s.dependencyAudit.status === "passed" ? "var(--sage-200)" : s.dependencyAudit.status === "skipped" ? "var(--latte-500)" : "var(--clay-200)"}">
+                  \${s.dependencyAudit.status === "passed" ? "✓" : s.dependencyAudit.status === "skipped" ? "○" : "✗"}
+                </span>
+                <strong style="margin-inline-start:0.35rem;color:var(--latte-100)">Dependency Audit</strong>
+                <span style="color:var(--latte-400);margin-inline-start:0.5rem">\${esc(s.dependencyAudit.command || s.dependencyAudit.reason || "")}</span>
+              </span>
+              <span style="color:var(--latte-500)">\${s.dependencyAudit.durationMs || 0}ms</span>
+            </div>
+            \${s.dependencyAudit.status === "failed" && s.dependencyAudit.output ? \`<pre>\${esc(s.dependencyAudit.output)}</pre>\` : ""}
+          </div>
+        </div>
+      \`;
+    }
+
     function renderFarmDetail() {
       const main = document.getElementById("main");
       if (!state.detail) {
@@ -2143,6 +2200,10 @@ const VIEWER_HTML = `<!doctype html>
                 <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
                 Run Gates
               </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-run-security">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>
+                Security Scan
+              </button>
               <button type="button" class="btn btn-secondary btn-sm" id="btn-jump-check" style="\${checklist.summary.percent === 100 && checklist.summary.activeTotal > 0 ? "border-color:rgba(118,145,102,0.35);color:var(--sage-200)" : ""}">
                 Checklist <span style="color:var(--latte-400);font-size:11px">\${checklist.summary.percent}%</span>
               </button>
@@ -2178,8 +2239,16 @@ const VIEWER_HTML = `<!doctype html>
 
       if (state.tab === "overview") {
         const farmhouseDoc = docs.find((d) => d.path === "_AUDIT/FARMHOUSE.md");
+        const pillarArt = {
+          security: "/assets/audit-security.webp",
+          performance: "/assets/audit-performance.webp",
+          accessibility: "/assets/audit-accessibility.webp",
+          "code-quality": "/assets/audit-code-quality.webp",
+        };
+        const pillars = health.pillars || [];
         bodyHtml = \`
           \${renderGatesPanel()}
+          \${renderSecurityPanel()}
           <div class="art-grid">
             <div class="surface card-hover art-card" data-open-doc="_AUDIT/FARMHOUSE.md">
               <img src="/assets/audit-farmhouse.webp" alt="" class="art-bg" />
@@ -2201,16 +2270,18 @@ const VIEWER_HTML = `<!doctype html>
                 <span class="badge \${health.metrics.checklistPercent >= 80 ? "badge-success" : "badge-gold"}">\${health.metrics.checklistCompleted}/\${health.metrics.checklistActive}</span>
               </div>
             </div>
-            <div class="surface card-hover art-card" data-switch-tab="ideas">
-              <img src="/assets/audit-garden.webp" alt="" class="art-bg" />
-              <div class="art-card-inner">
-                <div>
-                  <h4>Idea Garden</h4>
-                  <p>\${health.metrics.activeIdeas} active · \${health.metrics.wiltingIdeas} wilting · \${health.metrics.compostedIdeas} composted</p>
+            \${pillars.map((p) => \`
+              <div class="surface \${p.exists ? "card-hover" : ""} art-card" \${p.exists ? \`data-open-doc="\${esc(p.path)}"\` : 'style="opacity:0.58;cursor:default"'}>
+                <img src="\${pillarArt[p.key] || "/assets/main-bg.webp"}" alt="" class="art-bg" />
+                <div class="art-card-inner">
+                  <div>
+                    <h4>\${esc(p.title.replace(" Audit", ""))}</h4>
+                    <p>\${esc(p.exists ? (p.status || p.description) : "Not audited yet — run via MCP")}</p>
+                  </div>
+                  \${p.exists && p.score !== null ? scorePipHtml(p.score) : '<span class="score-pip score-pip-muted">&mdash;</span>'}
                 </div>
-                <span class="badge badge-muted">\${plans.length} plans</span>
               </div>
-            </div>
+            \`).join("")}
           </div>
 
           <div class="surface" style="padding:1.35rem 1.5rem;margin-block-end:1.5rem">
@@ -2426,6 +2497,23 @@ const VIEWER_HTML = `<!doctype html>
         }
       });
 
+      main.querySelector("#btn-run-security")?.addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = "Scanning...";
+        try {
+          state.securityResult = await api("/api/security", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: state.selectedPath }),
+          });
+          state.tab = "overview";
+          render();
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
       for (const tabBtn of main.querySelectorAll("[data-tab]")) {
         tabBtn.addEventListener("click", () => { state.tab = tabBtn.dataset.tab; render(); });
       }
@@ -2605,6 +2693,7 @@ const VIEWER_HTML = `<!doctype html>
       state.selectedPath = farmPath;
       state.tab = tab;
       state.gateResult = null;
+      state.securityResult = null;
       state.view = "farm";
       render();
       state.detail = await api("/api/farm?path=" + encodeURIComponent(farmPath));

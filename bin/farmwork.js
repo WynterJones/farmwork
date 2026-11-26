@@ -3,7 +3,7 @@
 import { program } from "commander";
 import { VERSION } from "../src/core.js";
 import { init } from "../src/init.js";
-import { status, audit, gates } from "../src/status.js";
+import { status, audit, gates, security } from "../src/status.js";
 import { doctor } from "../src/doctor.js";
 import { startMcpServer } from "../src/mcp.js";
 import { startViewer } from "../src/viewer.js";
@@ -54,10 +54,17 @@ program
 
 program
   .command("gates")
-  .description("Run detected lint, test, and build quality gates")
-  .option("--only <gates>", "Comma-separated subset: lint,test,build")
+  .description("Run detected lint, test, build, and security quality gates")
+  .option("--only <gates>", "Comma-separated subset: lint,test,build,security")
   .option("--json", "Output JSON")
   .action(gates);
+
+program
+  .command("security")
+  .description("Run deterministic secrets scan and stack dependency vulnerability audit")
+  .option("--skip-deps", "Only run fast local secrets & tracked-file scan")
+  .option("--json", "Output JSON")
+  .action(security);
 
 program
   .command("doctor")

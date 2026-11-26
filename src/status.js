@@ -1,4 +1,4 @@
-import { VERSION, LegacyFarmworkError, computeHealth, runAudit, runGates } from "./core.js";
+import { VERSION, LegacyFarmworkError, computeHealth, runAudit, runGates, runSecurityScan } from "./core.js";
 import { farmTerm, emojis } from "./terminal.js";
 
 export async function status(options = {}) {
@@ -103,4 +103,42 @@ export async function gates(options = {}) {
   }
   console.log("");
   if (!result.allPassed) process.exitCode = 1;
+}
+
+export async function security(options = {}) {
+  const result = runSecurityScan(process.cwd(), { skipDeps: Boolean(options.skipDeps) });
+
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    if (!result.passed) process.exitCode = 1;
+    return;
+  }
+
+  farmTerm.banner(VERSION);
+  farmTerm.header(`SECURITY SCAN · ${result.projectName}`);
+
+  farmTerm.section("Secrets & Sensitive Files");
+  if (result.secretFindings.length === 0) {
+    farmTerm.status(`Scanned ${result.filesScanned} files — no leaked secrets or committed .env/key files`, true);
+  } else {
+    for (const f of result.secretFindings) {
+      farmTerm.status(`${f.type}: ${f.file}${f.line ? `:${f.line}` : ""}`, false, f.detail);
+    }
+  }
+
+  farmTerm.section("Dependency & Static Audit");
+  if (result.dependencyAudit.status === "skipped") {
+    farmTerm.dim(`• ${result.dependencyAudit.reason}`);
+  } else {
+    farmTerm.status(
+      `${result.dependencyAudit.tool} (${result.dependencyAudit.command})`,
+      result.dependencyAudit.status === "passed",
+      `${result.dependencyAudit.durationMs}ms`,
+    );
+    if (result.dependencyAudit.status === "failed" && result.dependencyAudit.output) {
+      console.log(`\n${result.dependencyAudit.output}\n`);
+    }
+  }
+  console.log("");
+  if (!result.passed) process.exitCode = 1;
 }
