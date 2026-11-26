@@ -1,36 +1,46 @@
 {
   "name": "farmwork",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "type": "module",
-  "description": "Farmwork - A workflow framework for Claude Code by Wynter Jones",
+  "description": "Agent-first standards, MCP server, and local Farm Viewer for AI-assisted software projects",
   "main": "src/index.js",
   "bin": {
     "farmwork": "./bin/farmwork.js"
   },
   "files": [
     "src",
-    "bin"
+    "bin",
+    "assets",
+    "README.md"
   ],
   "scripts": {
-    "test": "node --test"
+    "test": "node --test test/*.test.js",
+    "mcp": "node ./bin/farmwork.js mcp",
+    "view": "node ./bin/farmwork.js view"
   },
   "keywords": [
-    "cli",
+    "mcp",
+    "model-context-protocol",
     "ai",
+    "agents",
     "claude",
-    "development",
+    "gemini",
+    "codex",
+    "cursor",
     "workflow",
-    "automation",
-    "agentic"
+    "standards",
+    "cli",
+    "farmwork"
   ],
   "author": "Wynter Jones",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "fs-extra": "^11.2.0",
     "inquirer": "^9.2.12",
-    "terminal-kit": "^3.1.1"
+    "zod": "^4.6.7"
   },
   "engines": {
     "node": ">=18.0.0"

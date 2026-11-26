@@ -1,134 +1,106 @@
-import fs from "fs-extra";
-import path from "path";
-import { execSync } from "child_process";
+import { VERSION, LegacyFarmworkError, computeHealth, runAudit, runGates } from "./core.js";
 import { farmTerm, emojis } from "./terminal.js";
 
-function countTestFiles(dir) {
-  try {
-    if (!fs.existsSync(dir)) return 0;
-    const result = execSync(
-      `find "${dir}" -name "*.test.*" -not -path "*/node_modules/*" 2>/dev/null | wc -l`,
-      { encoding: "utf8" },
-    );
-    return parseInt(result.trim()) || 0;
-  } catch {
-    return 0;
-  }
-}
+export async function status(options = {}) {
+  const health = computeHealth(process.cwd());
 
-function countMarkdownFiles(dir) {
-  try {
-    if (!fs.existsSync(dir)) return 0;
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
-    return files.length;
-  } catch {
-    return 0;
-  }
-}
-
-function readAuditFile(cwd, filename) {
-  const filePath = path.join(cwd, "_AUDIT", filename);
-  if (!fs.existsSync(filePath)) return null;
-
-  try {
-    const content = fs.readFileSync(filePath, "utf8");
-    const scoreMatch = content.match(/\*\*Score:\*\* (\d+\.?\d*)\/10/);
-    const statusMatch = content.match(/\*\*Status:\*\* (.+)/);
-    const lastUpdatedMatch = content.match(/\*\*Last Updated:\*\* (\d{4}-\d{2}-\d{2})/);
-
-    return {
-      score: scoreMatch ? parseFloat(scoreMatch[1]) : null,
-      status: statusMatch ? statusMatch[1].trim() : null,
-      lastUpdated: lastUpdatedMatch ? lastUpdatedMatch[1] : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export async function status() {
-  const cwd = process.cwd();
-
-  const claudeDir = path.join(cwd, ".claude");
-  if (!fs.existsSync(claudeDir)) {
-    farmTerm.error("Farmwork not initialized");
-    farmTerm.info("Run: farmwork init");
+  if (options.json) {
+    console.log(JSON.stringify(health, null, 2));
     return;
   }
 
-  farmTerm.logo();
-  farmTerm.header("FARMWORK STATUS", "primary");
-  await farmTerm.analyzing("Scanning project", 800);
+  farmTerm.banner(VERSION);
+  farmTerm.header(`STATUS · ${health.projectName}`);
 
-  const agentsDir = path.join(claudeDir, "agents");
-  const commandsDir = path.join(claudeDir, "commands");
-  const auditDir = path.join(cwd, "_AUDIT");
-  const plansDir = path.join(cwd, "_PLANS");
-
-  const agents = countMarkdownFiles(agentsDir);
-  const commands = countMarkdownFiles(commandsDir);
-  const audits = countMarkdownFiles(auditDir);
-  const plans = countMarkdownFiles(plansDir);
-
-  // Component Counts Section
-  farmTerm.section("Component Counts", emojis.corn);
-  farmTerm.metric("Agents", agents, emojis.horse);
-  farmTerm.metric("Commands", commands, emojis.bee);
-  farmTerm.metric("Audit Docs", audits, emojis.wheat);
-  farmTerm.metric("Plans", plans, emojis.sunflower);
-
-  // Audit Scores Section
-  const farmhouse = readAuditFile(cwd, "FARMHOUSE.md");
-  if (farmhouse && farmhouse.score !== null) {
-    farmTerm.section("Audit Scores", emojis.owl);
-    farmTerm.score("Farmhouse", farmhouse.score, 10);
+  if (!health.initialized) {
+    farmTerm.warn("Farmwork is not initialized in this directory.");
+    farmTerm.info("Run `farmwork init` to set up .farmwork.json, AGENTS.md, .mcp.json, and _AUDIT/.\n");
+    return;
   }
 
-  // Configuration Files Section
-  const claudeMd = path.join(cwd, "CLAUDE.md");
+  if (health.install?.isLegacy) {
+    farmTerm.warn(`Legacy Farmwork (${health.install.generation}) detected — read-only mode.`);
+    farmTerm.dim("v3 will not modify past Farmwork apps. Run `farmwork init --reinstall` if you want to reinstall v3.\n");
+  }
 
-  farmTerm.section("Configuration Status", emojis.seedling);
+  farmTerm.section("Overview", emojis.wheat);
+  farmTerm.kv("Stack", health.stack);
+  farmTerm.kv("Farmwork", health.install?.generation === "v3" ? `v${health.install.version}` : `legacy (${health.install?.generation})`);
+  farmTerm.kv("Git", health.git.isGitRepo ? `${health.git.branch} (${health.git.dirtyCount} uncommitted)` : "not a git repo");
+  farmTerm.kv("Test Files", String(health.metrics.testFiles));
+  farmTerm.kv("Checklist", `${health.metrics.checklistPercent}% (${health.metrics.checklistCompleted}/${health.metrics.checklistActive})`);
+  farmTerm.kv("Plans", `${health.metrics.completedPlans}/${health.metrics.totalPlans} complete`);
+  farmTerm.kv("Idea Garden", `${health.metrics.activeIdeas} active (${health.metrics.wiltingIdeas} wilting), ${health.metrics.compostedIdeas} composted`);
 
-  const configItems = [
-    { label: "CLAUDE.md", exists: fs.existsSync(claudeMd) },
-    { label: ".claude/agents/", exists: fs.existsSync(agentsDir) && agents > 0 },
-    { label: ".claude/commands/", exists: fs.existsSync(commandsDir) && commands > 0 },
-    { label: "_AUDIT/FARMHOUSE.md", exists: fs.existsSync(path.join(auditDir, "FARMHOUSE.md")) },
-    { label: "_AUDIT/GARDEN.md", exists: fs.existsSync(path.join(auditDir, "GARDEN.md")) },
-    { label: "_AUDIT/COMPOST.md", exists: fs.existsSync(path.join(auditDir, "COMPOST.md")) },
-    { label: "_PLANS/", exists: fs.existsSync(plansDir) },
-  ];
+  farmTerm.section("Health Score");
+  farmTerm.scoreBar(health.status, health.score, 10);
+  console.log("");
+  for (const item of health.breakdown) {
+    farmTerm.status(item.label, item.passed, `${item.points}/${item.max}`);
+  }
+  console.log("");
+}
 
-  for (const item of configItems) {
-    if (item.exists) {
-      farmTerm.status(item.label, "pass");
+export async function audit(options = {}) {
+  let result;
+  try {
+    result = runAudit(process.cwd());
+  } catch (err) {
+    if (err instanceof LegacyFarmworkError) {
+      if (options.json) {
+        console.log(JSON.stringify({ error: err.message, code: err.code, generation: err.generation }, null, 2));
+      } else {
+        farmTerm.banner(VERSION);
+        farmTerm.header("AUDIT · BLOCKED (LEGACY)");
+        farmTerm.warn(err.message);
+        console.log("");
+      }
+      process.exitCode = 1;
+      return;
+    }
+    throw err;
+  }
+
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  farmTerm.banner(VERSION);
+  farmTerm.header(`AUDIT · ${result.health.projectName}`);
+  farmTerm.scoreBar(result.health.status, result.health.score, 10);
+  farmTerm.kv("Updated", "_AUDIT/FARMHOUSE.md");
+  if (result.gardenResult.wilting.length > 0) {
+    farmTerm.warn(`Wilting ideas (45-60d): ${result.gardenResult.wilting.join(", ")}`);
+  }
+  if (result.gardenResult.autoComposted.length > 0) {
+    farmTerm.warn(`Auto-composted (>60d): ${result.gardenResult.autoComposted.join(", ")}`);
+  }
+  console.log("");
+}
+
+export async function gates(options = {}) {
+  const only = options.only ? String(options.only).split(",").map((s) => s.trim()).filter(Boolean) : null;
+  const result = runGates(process.cwd(), { only });
+
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    if (!result.allPassed) process.exitCode = 1;
+    return;
+  }
+
+  farmTerm.banner(VERSION);
+  farmTerm.header(`QUALITY GATES · ${result.projectName}`);
+  for (const r of result.results) {
+    if (r.status === "skipped") {
+      farmTerm.dim(`• ${r.gate}: skipped (no command configured)`);
     } else {
-      farmTerm.status(item.label, "fail", "(missing)");
+      farmTerm.status(`${r.gate} (${r.command})`, r.status === "passed", `${r.durationMs}ms`);
+      if (r.status === "failed" && r.output) {
+        console.log(`\n${r.output}\n`);
+      }
     }
   }
-
-  // Project Metrics Section
-  const testFiles = countTestFiles(cwd);
-
-  if (testFiles > 0) {
-    farmTerm.section("Project Metrics", emojis.sunflower);
-    farmTerm.metric("Test Files", testFiles, emojis.potato);
-  }
-
-  // ASCII art + command reference
-  farmTerm.nl();
-  farmTerm.printTractor();
-
-  farmTerm.section("Commands", emojis.tractor);
-  farmTerm.commands([
-    { name: "/audit", description: "Refresh metrics, tend the Idea Garden" },
-    { name: "/inspect", description: "Audit + code review + dry-run gates" },
-    { name: "/add-idea", description: "Plant an idea in the Garden" },
-    { name: "/new-ideas", description: "Generate 10 ideas, plant the keepers" },
-    { name: "/compost", description: "Retire an idea, with a reason" },
-    { name: "/plan-idea", description: "Graduate an idea into _PLANS/" },
-    { name: "/push", description: "Clean, gate, commit, push, update metrics" },
-  ]);
-
-  farmTerm.gray("  Run `farmwork doctor` to check for issues.\n\n");
+  console.log("");
+  if (!result.allPassed) process.exitCode = 1;
 }

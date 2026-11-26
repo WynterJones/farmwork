@@ -1,6 +1,10 @@
-<img src="logo.png" alt="Farmwork - Developer Methodology" width="300" />
+<img src="logo.png" alt="Farmwork - Agent-First Standards & MCP" width="260" />
 
-> A workflow framework for Claude Code by Wynter Jones
+> **Farmwork v3** — Agent-first engineering standards, an MCP server any AI agent can use natively, and a zero-server Local Farm Viewer for your Markdown docs and checklists.
+
+Built for **real projects beyond prototypes** where you want Claude Code, Gemini CLI, Codex, Cursor, or Antigravity to follow consistent planning, auditing, checklist, and quality-gate standards without prompt drift or hosted dashboards.
+
+---
 
 ## Quick Start
 
@@ -8,178 +12,124 @@
 npm install -g farmwork
 ```
 
+Initialize any repo (Node/TS, Ruby/Rails, Python, Rust, or Go):
+
 ```bash
 cd your-project
 farmwork init
-farmwork doctor
-farmwork status
 ```
 
-Or run directly with npx:
+Open the **Local Farm Viewer** for one project or a folder full of projects:
 
 ```bash
-npx farmwork init
+farmwork view            # view current project
+farmwork view ~/Work     # view all local Farmwork projects in ~/Work
 ```
 
-`farmwork init` auto-detects your package manager and test/build/lint commands from
-`package.json` - there's nothing else to configure.
+---
 
-----
+## Connect Any AI Agent via MCP
 
-## The Farmwork Method
+`farmwork init` writes a `.mcp.json` automatically so Claude Code, Cursor, and Antigravity discover Farmwork out of the box.
 
-Farmwork is intentionally small: **7 commands, 4 agents**. No issue tracker, no task
-runner, no product-strategy scaffolding - just the practices that pull their weight.
+To register Farmwork globally for any MCP-capable agent:
 
-### Core Concepts
-
-1. **Slash Commands** - Every workflow is an explicit command. Nothing fires on its own.
-2. **Agents** - 4 focused AI subagents the commands delegate to
-3. **Living Audits** - `_AUDIT/FARMHOUSE.md` tracks metrics over time
-4. **Plan & Implement** - Plans are saved before implementation
-5. **Idea Garden** - Pre-plan creative stage with natural aging
-
-### Commands
-
-Type `/` in Claude Code to see them all. Each does exactly one thing.
-
-| Command | What It Does |
-|---------|--------------|
-| `/audit` | Refresh FARMHOUSE.md metrics and tend the Idea Garden |
-| `/inspect` | Everything in `/audit`, plus a full code review and dry-run quality gates |
-| `/add-idea` | Plant a new idea in GARDEN.md |
-| `/new-ideas` | Generate 10 fresh ideas and plant the ones you pick |
-| `/compost` | Retire an idea to COMPOST.md with a reason |
-| `/plan-idea` | Graduate an idea into a plan in `_PLANS/` |
-| `/push` | Clean, review, test, build, commit, push, update metrics |
-
-`/audit` and `/inspect` never commit. Use `/push` to ship.
-
-### Agents
-
-4 focused agents included:
-
-| Agent | Purpose |
-|-------|---------|
-| `the-farmer` | Audit and update FARMHOUSE.md metrics |
-| `code-reviewer` | Quality, security (OWASP-lite), performance, code smells, and basic accessibility - reports inline |
-| `code-cleaner` | Remove comments (except JSDoc), console.logs, and obvious dead code |
-| `idea-gardener` | Manage the Idea Garden and Compost |
-
-### Recommended Workflow
-
-1. **Start Session**: `/audit` to see where things stand
-2. **Capture Ideas**: `/add-idea` as they occur to you, `/new-ideas` when you're stuck
-3. **Plan Work**: `/plan-idea` to turn one into a plan in `_PLANS/`
-4. **Implement**: Build the feature
-5. **Quality Check**: `/inspect` for a full review before shipping
-6. **Ship**: `/push` to clean, gate, commit, and push
-
-## Directory Structure
-
+```json
+{
+  "mcpServers": {
+    "farmwork": {
+      "command": "npx",
+      "args": ["-y", "farmwork", "mcp"]
+    }
+  }
+}
 ```
+
+Or in **Claude Code**:
+
+```bash
+claude mcp add farmwork -- npx -y farmwork mcp
+```
+
+Or in **Gemini CLI** (`~/.gemini/settings.json`) / **Codex** (`~/.codex/config.toml`): point an MCP server entry at `npx -y farmwork mcp` (or `farmwork mcp` if installed globally).
+
+---
+
+## What the MCP Server Gives Your Agents
+
+### 6 Lean Deterministic Tools
+
+| Tool | What It Does |
+|---|---|
+| `farmwork_status` | Deterministic health score (0–10), stack, polyglot test count, verified gate status, checklist %, garden, plans, git state |
+| `farmwork_audit` | Age Idea Garden (45d wilting, >60d auto-compost) and refresh `_AUDIT/FARMHOUSE.md` |
+| `farmwork_gates` | Run detected `lint`, `test`, and `build` commands, save verified results, and return structured pass/fail output |
+| `farmwork_checklist` | Read or idempotently `complete`, `pending`, `skip`, or `add` items in `_AUDIT/CHECKLIST.md` |
+| `farmwork_garden` | `list`, `plant`, or `compost` pre-plan ideas in `_AUDIT/GARDEN.md` (lazily creates `_AUDIT/COMPOST.md`) |
+| `farmwork_plan` | `list`, `create` (graduates linked garden ideas), or `complete` plans in `_PLANS/` |
+
+### 5 Live Resources
+- `farmwork://standards` — Universal agent engineering standards
+- `farmwork://farmhouse` — `_AUDIT/FARMHOUSE.md`
+- `farmwork://checklist` — `_AUDIT/CHECKLIST.md`
+- `farmwork://garden` — `_AUDIT/GARDEN.md`
+- `farmwork://compost` — `_AUDIT/COMPOST.md`
+
+### 5 Workflow Prompts
+`audit`, `inspect`, `plan`, `new-ideas`, and `ship` — exposed natively via MCP so you never copy-paste slash-command files across tools.
+
+---
+
+## Repo Structure
+
+```text
 your-project/
-├── CLAUDE.md              # Lean instructions (points at the commands)
-├── AGENTS.md              # Points other AI tools at the same command files
-├── _AUDIT/                 # Living audit + idea documents
-│   ├── FARMHOUSE.md         # Framework command center / metrics
-│   ├── GARDEN.md            # Idea nursery
-│   └── COMPOST.md           # Rejected ideas archive
-├── _PLANS/                 # Implementation plans
-└── .claude/                # Claude Code configuration
-    ├── commands/            # 7 slash commands - the workflows themselves
-    │   ├── audit.md
-    │   ├── inspect.md
-    │   ├── add-idea.md
-    │   ├── new-ideas.md
-    │   ├── compost.md
-    │   ├── plan-idea.md
-    │   └── push.md
-    └── agents/              # 4 subagents the commands delegate to
-        ├── the-farmer.md
-        ├── code-reviewer.md
-        ├── code-cleaner.md
-        └── idea-gardener.md
+├── .farmwork.json         # Manifest: detected stack + lint/test/build commands
+├── .mcp.json              # Auto-wires the Farmwork MCP server
+├── AGENTS.md              # Lean universal instructions for any AI agent
+├── CLAUDE.md              # Lean pointer to AGENTS.md + MCP
+├── _AUDIT/
+│   ├── FARMHOUSE.md       # Deterministic health report & audit history
+│   ├── CHECKLIST.md       # Stack-aware living standards ([x], [ ], [-] skip)
+│   └── GARDEN.md          # Pre-plan ideas with natural 45d/60d aging (COMPOST.md created on demand)
+└── _PLANS/
+    └── FEATURE_NAME.md    # Plan-before-implement specs
 ```
 
-## Commands
+---
 
-### `farmwork init`
-
-Set up your farm. Close to non-interactive - Farmwork detects your package manager
-(from lockfiles) and test/build/lint commands (from `package.json` scripts) on its own.
+## CLI Reference
 
 ```bash
-farmwork init                    # Auto-detects everything, confirms and goes
+farmwork init [-f] [-y] [--reinstall] [--no-mcp]  # Set up Farmwork v3 in current repo
+farmwork mcp [--cwd <path>]                       # Run MCP server over stdio
+farmwork view [path] [-p 4174]                    # Open Local Farm Viewer (1 repo or folder of repos)
+farmwork status [--json]                          # Deterministic health score & metrics
+farmwork audit [--json]                           # Refresh FARMHOUSE.md & tend Idea Garden
+farmwork gates [--only lint,test]                 # Run quality gates
+farmwork doctor [--json]                          # Diagnose configuration issues
 ```
 
-**Options:**
-- `-f, --force` - Overwrite existing files without prompting
+---
 
-**Creates:**
-- `CLAUDE.md` - Lean instructions pointing at the commands
-- `AGENTS.md` - Points Codex, Gemini CLI, and other tools at those same command files
-- `.claude/` - Claude Code configuration directory
-  - `commands/` - 7 slash commands
-  - `agents/` - 4 focused subagents
-- `_AUDIT/` - Living audit documents: `FARMHOUSE.md`, `GARDEN.md`, `COMPOST.md`
-- `_PLANS/` - Implementation plans directory
+## Past Farmwork Projects (v1 / v2)
 
-### `farmwork status`
+Farmwork v3 **never auto-updates or modifies past Farmwork v1/v2 projects**.
+- `farmwork view ~/Work` opens legacy repos in **read-only mode** so you can browse their docs without risking accidental edits.
+- `farmwork init`, `farmwork audit`, and mutating MCP tools refuse to modify legacy v1/v2 repos.
+- To explicitly move an older project to v3, run **`farmwork init --reinstall`** inside that repo (replaces `.farmwork.json`, `AGENTS.md`, `CLAUDE.md`, and `_AUDIT/FARMHOUSE.md`, safely merges `.mcp.json`, and preserves `_PLANS/`, `GARDEN.md`, and `COMPOST.md`).
 
-Display Farmwork status and metrics.
+---
 
-```bash
-farmwork status
-```
+## What Changed in v3.0.0
 
-**Shows:**
-- Component counts (commands, agents, audits, plans)
-- FARMHOUSE score
-- Configuration file status
-- Test file count
+- **Agent-First MCP Server:** Replaced static Claude-only `.claude/commands` & `.claude/agents` markdown prompts with a real MCP server (`farmwork mcp`) usable by Claude, Gemini, Codex, Cursor, and Antigravity.
+- **Local Farm Viewer (`farmwork view`):** Replaced hosted FarmFactory with a zero-database local viewer that reads and writes your `.md` files and checklists straight on disk.
+- **Removed unnecessary bloat:** Dropped `operator/`, legacy v1 phrase triggers, hardcoded `model: opus` prompts, destructive comment-stripping rules, and JS-only test counting.
+- **True Polyglot & Deterministic:** Auto-detects Node/TS, Ruby/Rails, Python, Rust, and Go, counts real test files across languages, and computes a transparent 0–10 health score.
 
-### `farmwork doctor`
-
-Check your Farmwork setup and diagnose issues.
-
-```bash
-farmwork doctor
-```
-
-**Checks:**
-- Core files (CLAUDE.md, `.claude/`)
-- Agents and commands configuration
-- Audit system (`_AUDIT/FARMHOUSE.md`, `_AUDIT/GARDEN.md`, `_AUDIT/COMPOST.md`, `_PLANS/`)
-- Security (`.gitignore` settings)
-
-## Cross-Tool Support
-
-Because every workflow is a plain markdown file in `.claude/commands/`, Farmwork
-travels. Codex reads command files directly - copy them into `~/.codex/prompts/` and
-`/audit`, `/push`, and the rest work there too. For anything else, the generated
-`AGENTS.md` points at those same files rather than restating them, so the instructions
-can't drift out of sync with what Claude Code actually runs.
-
-## Managing Many Farms
-
-Farmwork operates inside one repo. When you have a dozen, [the Operator](operator/)
-sits above them all - a globally-installed skill that sweeps every farm's git state,
-groups them by purpose, and tracks checklist progress. See [`operator/`](operator/).
-
-## Requirements
-
-- [Claude Code](https://claude.com/claude-code), or another AI coding assistant that
-  reads `AGENTS.md` (Codex, Gemini CLI, etc.)
-- Node.js 18+
-
-No other tools required - Farmwork has no external CLI dependencies.
+---
 
 ## License
 
-MIT
-
-## Links
-
-- [Farmwork Website](https://farmwork.dev)
-- [Wynter Jones](https://wynter.ai)
+MIT · Created by [Wynter Jones](https://wynter.ai) · [farmwork.dev](https://farmwork.dev)

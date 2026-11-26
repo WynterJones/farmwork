@@ -1,184 +1,64 @@
-import fs from "fs-extra";
-import path from "path";
-import { farmTerm, emojis } from "./terminal.js";
+import { VERSION, computeHealth } from "./core.js";
+import { farmTerm } from "./terminal.js";
 
-function checkExists(filePath, description) {
-  const exists = fs.existsSync(filePath);
-  return {
-    passed: exists,
-    message: description,
-    details: exists ? null : `Missing: ${filePath}`,
-  };
-}
-
-function checkDirectoryNotEmpty(dir, description) {
-  if (!fs.existsSync(dir)) {
-    return {
-      passed: false,
-      message: description,
-      details: `Directory missing: ${dir}`,
-    };
-  }
-  const files = fs.readdirSync(dir);
-  const hasContent = files.length > 0;
-  return {
-    passed: hasContent,
-    message: description,
-    details: hasContent ? null : `Directory empty: ${dir}`,
-  };
-}
-
-function checkClaudeMdSections(claudeMdPath) {
-  if (!fs.existsSync(claudeMdPath)) {
-    return {
-      passed: false,
-      message: "CLAUDE.md has required sections",
-      details: "File missing",
-    };
-  }
-
-  const content = fs.readFileSync(claudeMdPath, "utf8");
-  const requiredSections = ["Slash Commands", "Project Configuration"];
-
-  const missing = requiredSections.filter((section) => !content.includes(section));
-
-  return {
-    passed: missing.length === 0,
-    message: "CLAUDE.md has required sections",
-    details: missing.length > 0 ? `Missing sections: ${missing.join(", ")}` : null,
-  };
-}
-
-function checkFarmhouseFormat(farmhousePath) {
-  if (!fs.existsSync(farmhousePath)) {
-    return {
-      passed: false,
-      message: "FARMHOUSE.md follows format",
-      details: "File missing",
-    };
-  }
-
-  const content = fs.readFileSync(farmhousePath, "utf8");
-  const requiredFields = ["**Last Updated:**", "**Score:**", "**Status:**"];
-
-  const missing = requiredFields.filter((field) => !content.includes(field));
-
-  return {
-    passed: missing.length === 0,
-    message: "FARMHOUSE.md follows format",
-    details: missing.length > 0 ? `Missing fields: ${missing.join(", ")}` : null,
-  };
-}
-
-function checkGitignore(cwd) {
-  const gitignorePath = path.join(cwd, ".gitignore");
-  if (!fs.existsSync(gitignorePath)) {
-    return {
-      passed: false,
-      message: ".gitignore includes local settings",
-      details: "File missing",
-    };
-  }
-
-  const content = fs.readFileSync(gitignorePath, "utf8");
-  const hasLocalSettings = content.includes("settings.local.json");
-
-  return {
-    passed: hasLocalSettings,
-    message: ".gitignore includes local settings",
-    details: hasLocalSettings ? null : "Add: .claude/settings.local.json",
-  };
-}
-
-export async function doctor() {
+export async function doctor(options = {}) {
   const cwd = process.cwd();
+  const health = computeHealth(cwd);
+  const isLegacy = Boolean(health.install?.isLegacy);
+  const legacyList = (health.install?.legacyFiles || []).filter((f) => !f.startsWith(".farmwork.json"));
+  const repairCmd = isLegacy ? "Run `farmwork init --reinstall`" : "Run `farmwork init`";
 
-  farmTerm.logo();
-  farmTerm.header("FARMWORK DOCTOR", "accent");
-  await farmTerm.analyzing("Diagnosing project health", 1200);
+  const checks = [
+    {
+      label: ".farmwork.json v3 manifest",
+      passed: health.files.v3Manifest,
+      fix: isLegacy ? `Legacy ${health.install.generation} detected — run \`farmwork init --reinstall\`` : "Run `farmwork init`",
+    },
+    { label: "AGENTS.md universal instructions", passed: health.files.agentsMd, fix: repairCmd },
+    { label: "CLAUDE.md pointer", passed: health.files.claudeMd, fix: repairCmd },
+    { label: ".mcp.json MCP server config", passed: health.files.mcpConfig, fix: repairCmd },
+    { label: "_AUDIT/FARMHOUSE.md", passed: health.files.farmhouse, fix: isLegacy ? repairCmd : "Run `farmwork audit`" },
+    { label: "_AUDIT/CHECKLIST.md", passed: health.files.checklist, fix: repairCmd },
+    { label: "_AUDIT/GARDEN.md", passed: health.files.garden, fix: repairCmd },
+    { label: "_PLANS/ directory", passed: health.files.plansDir, fix: repairCmd },
+    {
+      label: "Automated test files detected",
+      passed: health.metrics.testFiles > 0,
+      fix: `Add tests for stack "${health.stack}"`,
+    },
+    {
+      label: "No legacy v1/v2 artifacts",
+      passed: legacyList.length === 0,
+      fix: legacyList.length > 0 ? `Optional cleanup: ${legacyList.join(", ")}` : "",
+    },
+  ];
 
-  const checks = [];
+  const passed = checks.filter((c) => c.passed).length;
+  const failed = checks.length - passed;
 
-  // Core Files
-  checks.push({ category: "Core Files", emoji: "🌾", items: [] });
-  checks[0].items.push(checkExists(path.join(cwd, "CLAUDE.md"), "CLAUDE.md exists"));
-  checks[0].items.push(checkExists(path.join(cwd, ".claude"), ".claude/ directory exists"));
-  checks[0].items.push(checkClaudeMdSections(path.join(cwd, "CLAUDE.md")));
-
-  // Claude Configuration
-  checks.push({ category: "Claude Configuration", emoji: "🐴", items: [] });
-  checks[1].items.push(
-    checkDirectoryNotEmpty(path.join(cwd, ".claude", "agents"), "Has agents defined"),
-  );
-  checks[1].items.push(
-    checkDirectoryNotEmpty(path.join(cwd, ".claude", "commands"), "Has commands defined"),
-  );
-
-  // Audit System
-  checks.push({ category: "Audit System", emoji: "🦉", items: [] });
-  checks[2].items.push(checkExists(path.join(cwd, "_AUDIT"), "_AUDIT/ directory exists"));
-  checks[2].items.push(
-    checkExists(path.join(cwd, "_AUDIT", "FARMHOUSE.md"), "FARMHOUSE.md exists"),
-  );
-  checks[2].items.push(checkFarmhouseFormat(path.join(cwd, "_AUDIT", "FARMHOUSE.md")));
-  checks[2].items.push(checkExists(path.join(cwd, "_AUDIT", "GARDEN.md"), "GARDEN.md exists"));
-  checks[2].items.push(checkExists(path.join(cwd, "_AUDIT", "COMPOST.md"), "COMPOST.md exists"));
-  checks[2].items.push(checkExists(path.join(cwd, "_PLANS"), "_PLANS/ directory exists"));
-
-  // Security
-  checks.push({ category: "Security", emoji: "🐕", items: [] });
-  checks[3].items.push(checkGitignore(cwd));
-
-  let totalPassed = 0;
-  let totalFailed = 0;
-
-  for (const category of checks) {
-    farmTerm.section(category.category, category.emoji);
-
-    for (const check of category.items) {
-      await new Promise((r) => setTimeout(r, 80));
-
-      if (check.passed) {
-        farmTerm.status(check.message, "pass");
-        totalPassed++;
-      } else {
-        farmTerm.status(check.message, "fail", check.details || "");
-        totalFailed++;
-      }
-    }
+  if (options.json) {
+    console.log(JSON.stringify({ projectName: health.projectName, install: health.install, passed, failed, checks }, null, 2));
+    return;
   }
 
-  // Summary
-  farmTerm.nl();
-  farmTerm.divider("═", 50);
-  farmTerm.section("Diagnosis Summary", "🐮");
+  farmTerm.banner(VERSION);
+  farmTerm.header(`DOCTOR · ${health.projectName}`);
 
-  farmTerm.metric("Passed", totalPassed, emojis.seedling);
-  if (totalFailed > 0) {
-    farmTerm.metric("Failed", totalFailed, "🍂");
+  if (isLegacy) {
+    farmTerm.warn(`Legacy Farmwork (${health.install.generation}) detected — v3 leaves past projects untouched until you run \`farmwork init --reinstall\`.\n`);
   }
 
-  const health = totalFailed === 0 ? "Excellent" : totalFailed <= 2 ? "Needs Attention" : "Critical";
+  for (const c of checks) {
+    farmTerm.status(c.label, c.passed, c.passed ? "" : c.fix);
+  }
 
-  farmTerm.nl();
-  farmTerm.divider();
-
-  if (health === "Excellent") {
-    farmTerm.success(`Health: ${health} - Your farm is thriving! 🌳`);
-  } else if (health === "Needs Attention") {
-    farmTerm.warn(`Health: ${health} - Some areas need work 🌱`);
+  console.log("");
+  farmTerm.scoreBar("Doctor Score", passed, checks.length);
+  if (failed === 0) {
+    farmTerm.success("All Farmwork v3 checks passed.\n");
+  } else if (isLegacy) {
+    farmTerm.warn(`Past Farmwork (${health.install.generation}) repo. Run \`farmwork init --reinstall\` if you want to move it to v3.\n`);
   } else {
-    farmTerm.error(`Health: ${health} - Urgent care needed! 🥀`);
+    farmTerm.warn(`${failed} issue(s) found. Run \`farmwork init\` to repair missing files.\n`);
   }
-
-  if (totalFailed > 0) {
-    farmTerm.nl();
-    farmTerm.info("Run `farmwork init` to fix missing components.");
-  }
-
-  const healthPercent = Math.round((totalPassed / (totalPassed + totalFailed)) * 100);
-  farmTerm.nl();
-  farmTerm.score("Overall Health", healthPercent, 100);
-
-  farmTerm.nl();
 }
