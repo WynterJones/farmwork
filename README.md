@@ -57,23 +57,26 @@ Or in **Gemini CLI** (`~/.gemini/settings.json`) / **Codex** (`~/.codex/config.t
 
 ## What the MCP Server Gives Your Agents
 
-### 6 Lean Deterministic Tools
+### 8 Lean Deterministic Tools
 
 | Tool | What It Does |
 |---|---|
-| `farmwork_status` | Deterministic health score (0–10), pillar scores, stack, polyglot test count, verified gate status, checklist %, garden, plans, git state |
+| `farmwork_status` | Deterministic health score (0–10), pillar scores, Beads summary, Justfile recipes, stack, test count, gates, checklist %, garden, plans, git state |
 | `farmwork_audit` | Age Idea Garden & refresh `_AUDIT/FARMHOUSE.md`, OR run/save lazy pillar audits (`security`, `performance`, `accessibility`, `code-quality`) |
 | `farmwork_gates` | Run detected `lint`, `test`, `build`, and local `security` secrets check, saving verified results |
+| `farmwork_beads` | Track project tasks & dependency graphs via [Beads](https://beads.gascity.com/) (`status`, `ready`, `list`, `create`, `claim`, `update`, `close`, `dep`, `sync`, `init`) |
+| `farmwork_just` | Inspect, run, or generate a maintained [Justfile](https://just.systems/man/en/) (`list`, `run`, `init`) |
 | `farmwork_checklist` | Read or idempotently `complete`, `pending`, `skip`, or `add` items in `_AUDIT/CHECKLIST.md` |
 | `farmwork_garden` | `list`, `plant`, or `compost` pre-plan ideas in `_AUDIT/GARDEN.md` (lazily creates `_AUDIT/COMPOST.md`) |
 | `farmwork_plan` | `list`, `create` (graduates linked garden ideas), or `complete` plans in `_PLANS/` |
 
-### 5 Live Resources
+### 6 Live Resources
 - `farmwork://standards` — Universal agent engineering standards
 - `farmwork://farmhouse` — `_AUDIT/FARMHOUSE.md`
 - `farmwork://checklist` — `_AUDIT/CHECKLIST.md`
 - `farmwork://garden` — `_AUDIT/GARDEN.md`
 - `farmwork://compost` — `_AUDIT/COMPOST.md`
+- `farmwork://justfile` — Maintained `justfile` recipes
 
 ### 7 Workflow Prompts
 `audit`, `inspect`, `security`, `performance`, `plan`, `new-ideas`, and `ship` — exposed natively via MCP so you never copy-paste slash-command files across tools.
@@ -84,6 +87,8 @@ Or in **Gemini CLI** (`~/.gemini/settings.json`) / **Codex** (`~/.codex/config.t
 
 ```text
 your-project/
+├── justfile               # Maintained command recipes (`just --list`, `just check`, `just ready`)
+├── .beads/                # Git-backed Beads task & dependency graph (`bd ready`, `bd sync`)
 ├── .farmwork.json         # Manifest: detected stack + lint/test/build commands
 ├── .mcp.json              # Auto-wires the Farmwork MCP server
 ├── AGENTS.md              # Lean universal instructions for any AI agent
@@ -91,7 +96,7 @@ your-project/
 ├── _AUDIT/
 │   ├── FARMHOUSE.md       # Deterministic health report & audit history
 │   ├── CHECKLIST.md       # Stack-aware living standards ([x], [ ], [-] skip)
-│   └── GARDEN.md          # Pre-plan ideas with natural 45d/60d aging (COMPOST.md created on demand)
+│   └── GARDEN.md          # Pre-plan ideas with natural 45d/60d aging (COMPOST & pillars created on demand)
 └── _PLANS/
     └── FEATURE_NAME.md    # Plan-before-implement specs
 ```
@@ -101,13 +106,15 @@ your-project/
 ## CLI Reference
 
 ```bash
-farmwork init [-f] [-y] [--reinstall] [--npx] [--no-mcp]  # Set up Farmwork v3 in current repo
+farmwork init [-f] [-y] [--reinstall] [--npx] [--no-justfile] [--no-beads]
 farmwork mcp [--cwd <path>]                               # Run MCP server over stdio
 farmwork view [path] [-p 4174]                            # Open Local Farm Viewer (1 repo or folder of repos)
-farmwork status [--json]                                  # Deterministic health score & pillar scores
+farmwork status [--json]                                  # Deterministic health score, Beads & Justfile summary
 farmwork audit [--json]                                   # Refresh FARMHOUSE.md & tend Idea Garden
 farmwork gates [--only lint,test,build,security]          # Run quality & security gates
 farmwork security [--skip-deps] [--json]                  # Deterministic secrets & dependency vulnerability scan
+farmwork beads [--init] [--prefix <p>] [--json]           # Show Beads summary + ready unblocked work
+farmwork just [recipe] [--init] [--force] [--json]        # List recipes, run a recipe, or generate starter justfile
 farmwork doctor [--json]                                  # Diagnose configuration issues
 ```
 

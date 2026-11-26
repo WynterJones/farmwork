@@ -23,6 +23,12 @@ import {
   compostIdea,
   createPlan,
   completePlan,
+  detectJustfile,
+  initJustfile,
+  runJustRecipe,
+  getBeadsState,
+  initBeads,
+  runBeadsAction,
 } from "./core.js";
 import { farmTerm } from "./terminal.js";
 
@@ -84,6 +90,8 @@ function getFarmDetail(farmDir) {
     garden: parseGarden(farmDir),
     compost: parseCompost(farmDir),
     plans: listPlans(farmDir),
+    beads: getBeadsState(farmDir, { includeIssues: true }),
+    justfile: detectJustfile(farmDir),
     docs: readFarmDocs(farmDir),
   };
 }
@@ -128,6 +136,7 @@ export function createViewerServer(rootDir) {
       watchDirSafe(farm.path);
       watchDirSafe(path.join(farm.path, "_AUDIT"));
       watchDirSafe(path.join(farm.path, "_PLANS"));
+      watchDirSafe(path.join(farm.path, ".beads"));
     }
   };
 
@@ -303,6 +312,95 @@ export function createViewerServer(rootDir) {
         }
         completePlan(target, body.plan);
         sendJson(res, 200, getFarmDetail(target));
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/beads/init") {
+        const body = await readBody(req);
+        const target = body.path || resolvedRoot;
+        if (!isWithinRoot(resolvedRoot, target)) {
+          sendJson(res, 403, { error: "Path outside viewer root" });
+          return;
+        }
+        initBeads(target, { prefix: body.prefix });
+        sendJson(res, 200, getFarmDetail(target));
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/beads/create") {
+        const body = await readBody(req);
+        const target = body.path || resolvedRoot;
+        if (!isWithinRoot(resolvedRoot, target)) {
+          sendJson(res, 403, { error: "Path outside viewer root" });
+          return;
+        }
+        runBeadsAction(target, {
+          action: "create",
+          title: body.title,
+          type: body.type || "task",
+          priority: body.priority ?? 2,
+          description: body.description || "",
+        });
+        sendJson(res, 200, getFarmDetail(target));
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/beads/update") {
+        const body = await readBody(req);
+        const target = body.path || resolvedRoot;
+        if (!isWithinRoot(resolvedRoot, target)) {
+          sendJson(res, 403, { error: "Path outside viewer root" });
+          return;
+        }
+        runBeadsAction(target, { action: "update", id: body.id, status: body.status });
+        sendJson(res, 200, getFarmDetail(target));
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/beads/close") {
+        const body = await readBody(req);
+        const target = body.path || resolvedRoot;
+        if (!isWithinRoot(resolvedRoot, target)) {
+          sendJson(res, 403, { error: "Path outside viewer root" });
+          return;
+        }
+        runBeadsAction(target, { action: "close", id: body.id, reason: body.reason || "Completed from Local Viewer" });
+        sendJson(res, 200, getFarmDetail(target));
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/beads/sync") {
+        const body = await readBody(req);
+        const target = body.path || resolvedRoot;
+        if (!isWithinRoot(resolvedRoot, target)) {
+          sendJson(res, 403, { error: "Path outside viewer root" });
+          return;
+        }
+        const synced = runBeadsAction(target, { action: "sync" });
+        sendJson(res, 200, { ...synced, detail: getFarmDetail(target) });
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/just/init") {
+        const body = await readBody(req);
+        const target = body.path || resolvedRoot;
+        if (!isWithinRoot(resolvedRoot, target)) {
+          sendJson(res, 403, { error: "Path outside viewer root" });
+          return;
+        }
+        initJustfile(target, { force: Boolean(body.force) });
+        sendJson(res, 200, getFarmDetail(target));
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/just/run") {
+        const body = await readBody(req);
+        const target = body.path || resolvedRoot;
+        if (!isWithinRoot(resolvedRoot, target)) {
+          sendJson(res, 403, { error: "Path outside viewer root" });
+          return;
+        }
+        sendJson(res, 200, runJustRecipe(target, body.recipe, { args: body.args }));
         return;
       }
 
@@ -2020,6 +2118,8 @@ const VIEWER_HTML = `<!doctype html>
                         <span>Tests: <strong>\${f.metrics.testFiles}</strong></span>
                         <span>Plans: <strong>\${f.metrics.completedPlans}/\${f.metrics.totalPlans}</strong></span>
                         <span>Ideas: <strong style="color:var(--honey-200)">\${f.metrics.activeIdeas}</strong></span>
+                        \${f.beads?.initialized ? \`<span>Beads: <strong style="color:var(--sage-200)">\${f.beads.summary.ready} ready</strong></span>\` : ""}
+                        \${f.justfile?.exists ? \`<span>Just: <strong>\${f.justfile.recipes.length}</strong></span>\` : ""}
                       </div>
                     </div>
                     <div class="farm-card-right">
@@ -2170,9 +2270,11 @@ const VIEWER_HTML = `<!doctype html>
         return;
       }
 
-      const { health, checklist, garden, compost, plans, docs } = state.detail;
+      const { health, checklist, garden, compost, plans, beads, justfile, docs } = state.detail;
       const isLegacy = Boolean(health.install?.isLegacy);
       const t = scoreTier(health.score);
+      const beadsInfo = beads || { installed: false, initialized: false, summary: { total: 0, open: 0, inProgress: 0, blocked: 0, ready: 0, closed: 0 }, ready: [], issues: [] };
+      const justInfo = justfile || { installed: false, exists: false, file: null, recipes: [] };
 
       const headerHtml = \`
         <div class="breadcrumb">
@@ -2228,6 +2330,8 @@ const VIEWER_HTML = `<!doctype html>
 
         <nav class="repo-tabs" role="tablist">
           <button type="button" class="repo-tab \${state.tab === "overview" ? "active" : ""}" data-tab="overview">Audit</button>
+          <button type="button" class="repo-tab \${state.tab === "beads" ? "active" : ""}" data-tab="beads">Beads <span class="repo-tab-count">\${beadsInfo.initialized ? beadsInfo.summary.ready + " ready" : "off"}</span></button>
+          <button type="button" class="repo-tab \${state.tab === "justfile" ? "active" : ""}" data-tab="justfile">Justfile <span class="repo-tab-count">\${justInfo.exists ? justInfo.recipes.length : "off"}</span></button>
           <button type="button" class="repo-tab \${state.tab === "checklists" ? "active" : ""}" data-tab="checklists">Checklists <span class="repo-tab-count">\${checklist.summary.percent}%</span></button>
           <button type="button" class="repo-tab \${state.tab === "ideas" ? "active" : ""}" data-tab="ideas">Ideas <span class="repo-tab-count">\${garden.ideas.length}</span></button>
           <button type="button" class="repo-tab \${state.tab === "plans" ? "active" : ""}" data-tab="plans">Plans <span class="repo-tab-count">\${plans.length}</span></button>
@@ -2305,6 +2409,173 @@ const VIEWER_HTML = `<!doctype html>
             </div>
           \` : ""}
         \`;
+      } else if (state.tab === "beads") {
+        const s = beadsInfo.summary;
+        const prioBadge = (p) => {
+          const n = Number(p ?? 2);
+          if (n <= 0) return '<span class="badge badge-error">P0</span>';
+          if (n === 1) return '<span class="badge badge-warning">P1</span>';
+          if (n === 2) return '<span class="badge badge-gold">P2</span>';
+          return \`<span class="badge badge-muted">P\${n}</span>\`;
+        };
+        const statusBadge = (st) => {
+          if (st === "in_progress") return '<span class="badge badge-gold">in_progress</span>';
+          if (st === "closed") return '<span class="badge badge-success">closed</span>';
+          if (st === "blocked") return '<span class="badge badge-error">blocked</span>';
+          return \`<span class="badge badge-muted">\${esc(st || "open")}</span>\`;
+        };
+        const renderIssueRow = (it) => \`
+          <div class="surface" style="padding:1rem 1.25rem;margin-block-end:0.6rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;min-inline-size:0">
+                <code style="font-family:var(--font-mono);font-size:0.78rem;color:var(--honey-200)">\${esc(it.id)}</code>
+                \${prioBadge(it.priority)}
+                <span class="badge badge-muted">\${esc(it.issue_type || "task")}</span>
+                \${statusBadge(it.status)}
+                <span style="font-family:var(--font-mono);font-size:0.9rem;font-weight:500;color:var(--latte-50)">\${esc(it.title)}</span>
+              </div>
+              \${!isLegacy && beadsInfo.installed && it.status !== "closed" ? \`
+                <div style="display:flex;align-items:center;gap:0.4rem">
+                  \${it.status !== "in_progress" ? \`<button type="button" class="btn btn-secondary btn-sm" data-bead-claim="\${esc(it.id)}">Claim</button>\` : ""}
+                  <button type="button" class="btn btn-primary btn-sm" data-bead-close="\${esc(it.id)}">Close</button>
+                </div>
+              \` : ""}
+            </div>
+            \${it.description ? \`<p style="margin:0.45rem 0 0;font-size:0.84rem;color:var(--latte-400)">\${esc(it.description)}</p>\` : ""}
+          </div>
+        \`;
+
+        if (!beadsInfo.initialized) {
+          bodyHtml = \`
+            <div class="surface empty-state">
+              <h3>Beads Not Initialized</h3>
+              <p style="margin:0.4rem auto 1rem;max-inline-size:520px;font-size:0.86rem;color:var(--latte-400)">
+                Beads (<code>bd</code>) gives your AI agents a git-backed dependency graph for cross-session task tracking (<code>bd ready</code>, <code>bd create</code>, <code>bd close</code>, <code>bd sync</code>).
+              </p>
+              \${!isLegacy && beadsInfo.installed
+                ? '<button type="button" class="btn btn-primary btn-sm" id="btn-beads-init">Initialize Beads (.beads/)</button>'
+                : '<a href="https://beads.gascity.com/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">Install Beads (beads.gascity.com)</a>'}
+            </div>
+          \`;
+        } else {
+          const activeIssues = (beadsInfo.issues || []).filter((i) => i.status !== "closed");
+          const closedIssues = (beadsInfo.issues || []).filter((i) => i.status === "closed");
+          bodyHtml = \`
+            <div class="surface" style="padding:1.2rem 1.4rem;margin-block-end:1.25rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+              <div style="display:flex;gap:0.65rem;flex-wrap:wrap;align-items:center">
+                <span class="badge badge-success">\${s.ready} ready</span>
+                <span class="badge badge-gold">\${s.inProgress} in progress</span>
+                <span class="badge badge-muted">\${s.open} open</span>
+                \${s.blocked ? \`<span class="badge badge-error">\${s.blocked} blocked</span>\` : ""}
+                <span class="badge badge-muted">\${s.closed} closed</span>
+              </div>
+              <div style="display:flex;gap:0.5rem;align-items:center">
+                \${!isLegacy && beadsInfo.installed ? '<button type="button" class="btn btn-secondary btn-sm" id="btn-beads-sync">Sync Beads (bd sync)</button>' : ""}
+              </div>
+            </div>
+
+            \${!isLegacy && beadsInfo.installed ? \`
+              <div class="surface" style="padding:1.2rem 1.4rem;margin-block-end:1.5rem">
+                <h3 style="font-size:0.9rem;margin-block-end:0.8rem">Create New Bead</h3>
+                <form class="inline-form" id="beads-create-form">
+                  <input class="input-primary" name="title" placeholder="Task or feature title..." required />
+                  <select class="input-primary" name="type" style="max-inline-size:135px">
+                    <option value="task">task</option>
+                    <option value="feature">feature</option>
+                    <option value="bug">bug</option>
+                    <option value="epic">epic</option>
+                    <option value="chore">chore</option>
+                  </select>
+                  <select class="input-primary" name="priority" style="max-inline-size:100px">
+                    <option value="0">P0</option>
+                    <option value="1">P1</option>
+                    <option value="2" selected>P2</option>
+                    <option value="3">P3</option>
+                    <option value="4">P4</option>
+                  </select>
+                  <button type="submit" class="btn btn-primary btn-sm">+ Add Bead</button>
+                </form>
+              </div>
+            \` : ""}
+
+            <div class="check-group-title">Ready Work — No Blockers (\${beadsInfo.ready.length})</div>
+            \${beadsInfo.ready.length === 0
+              ? '<div class="surface empty-state"><p style="margin:0">No unblocked ready beads right now.</p></div>'
+              : beadsInfo.ready.map(renderIssueRow).join("")}
+
+            <div class="check-group-title" style="margin-block-start:1.75rem">All Active Issues (\${activeIssues.length})</div>
+            \${activeIssues.length === 0
+              ? '<div class="surface empty-state"><p style="margin:0">No open issues.</p></div>'
+              : activeIssues.map(renderIssueRow).join("")}
+
+            \${closedIssues.length > 0 ? \`
+              <div class="check-group-title" style="margin-block-start:1.75rem">Recently Closed (\${closedIssues.length})</div>
+              \${closedIssues.slice(0, 10).map(renderIssueRow).join("")}
+            \` : ""}
+          \`;
+        }
+      } else if (state.tab === "justfile") {
+        if (!justInfo.exists) {
+          bodyHtml = \`
+            <div class="surface empty-state">
+              <h3>No Justfile Yet</h3>
+              <p style="margin:0.4rem auto 1rem;max-inline-size:520px;font-size:0.86rem;color:var(--latte-400)">
+                A maintained <code>justfile</code> (<code>just.systems</code>) gives humans and AI agents instant, memorable recipes for dev, lint, test, build, Farmwork audits, and Beads commands.
+              </p>
+              \${!isLegacy
+                ? '<button type="button" class="btn btn-primary btn-sm" id="btn-just-init">Generate Stack-Aware Justfile</button>'
+                : '<span class="badge badge-warning">Legacy read-only</span>'}
+            </div>
+          \`;
+        } else {
+          const jr = state.justResult;
+          bodyHtml = \`
+            <div class="surface" style="padding:1.2rem 1.4rem;margin-block-end:1.25rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap">
+                <code style="font-family:var(--font-mono);font-size:0.9rem;color:var(--honey-200)">\${esc(justInfo.file)}</code>
+                <span class="badge badge-muted">\${justInfo.recipes.length} recipes</span>
+                <span class="badge \${justInfo.installed ? "badge-success" : "badge-warning"}">\${justInfo.installed ? "just CLI ready" : "install just CLI"}</span>
+              </div>
+              <div style="display:flex;gap:0.5rem">
+                <button type="button" class="btn btn-secondary btn-sm" data-open-doc="\${esc(justInfo.file)}">View Source</button>
+              </div>
+            </div>
+
+            \${jr ? \`
+              <div class="surface animate-in" style="padding:1.2rem 1.4rem;margin-block-end:1.25rem">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-block-end:0.65rem">
+                  <strong style="font-family:var(--font-mono);font-size:0.86rem;color:var(--latte-100)">\${esc(jr.command)}</strong>
+                  <span style="display:flex;align-items:center;gap:0.5rem">
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--latte-500)">\${jr.durationMs}ms</span>
+                    <span class="badge \${jr.passed ? "badge-success" : "badge-error"}">\${jr.passed ? "Passed" : "Exit " + jr.exitCode}</span>
+                  </span>
+                </div>
+                <pre style="margin:0;padding:0.75rem;border-radius:0.4rem;background:rgba(9,9,11,0.7);border:1px solid rgba(255,255,255,0.06);font-family:var(--font-mono);font-size:12px;color:var(--latte-200);overflow-x:auto;white-space:pre-wrap">\${esc(jr.output || "(no output)")}</pre>
+              </div>
+            \` : ""}
+
+            <div class="check-group-title">Maintained Recipes (\${justInfo.recipes.length})</div>
+            \${justInfo.recipes.map((r) => {
+              const hasRequiredParams = r.params.some((p) => !p.includes("="));
+              return \`
+                <div class="surface" style="padding:0.95rem 1.25rem;margin-block-end:0.55rem;display:flex;justify-content:space-between;align-items:center;gap:0.75rem;flex-wrap:wrap">
+                  <div style="min-inline-size:0;flex:1">
+                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+                      <code style="font-family:var(--font-mono);font-size:0.92rem;font-weight:600;color:var(--honey-200)">just \${esc(r.name)}</code>
+                      \${r.params.length ? \`<code style="font-size:0.76rem;color:var(--latte-400)">\${esc(r.params.join(" "))}</code>\` : ""}
+                      \${r.isDefault ? '<span class="badge badge-gold">default</span>' : ""}
+                      \${r.deps.length ? \`<span class="badge badge-muted">deps: \${esc(r.deps.join(", "))}</span>\` : ""}
+                    </div>
+                    \${r.description ? \`<p style="margin:0.35rem 0 0;font-size:0.83rem;color:var(--latte-400)">\${esc(r.description)}</p>\` : ""}
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm" data-run-just="\${esc(r.name)}" \${!justInfo.installed || hasRequiredParams ? "disabled" : ""} title="\${!justInfo.installed ? "Install just CLI first" : hasRequiredParams ? "Requires CLI arguments" : "Run recipe"}">
+                    Run
+                  </button>
+                </div>
+              \`;
+            }).join("")}
+          \`;
+        }
       } else if (state.tab === "checklists") {
         const complete = checklist.summary.activeTotal > 0 && checklist.summary.percent === 100;
         const groups = {};
@@ -2609,6 +2880,98 @@ const VIEWER_HTML = `<!doctype html>
             render();
           });
         }
+        main.querySelector("#btn-beads-init")?.addEventListener("click", async (e) => {
+          e.currentTarget.disabled = true;
+          e.currentTarget.textContent = "Initializing...";
+          state.detail = await api("/api/beads/init", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: state.selectedPath }),
+          });
+          await refreshFarmsOnly();
+          render();
+        });
+        main.querySelector("#btn-beads-sync")?.addEventListener("click", async (e) => {
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          btn.textContent = "Syncing...";
+          try {
+            const res = await api("/api/beads/sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ path: state.selectedPath }),
+            });
+            if (res.detail) state.detail = res.detail;
+            await refreshFarmsOnly();
+            render();
+          } finally {
+            btn.disabled = false;
+          }
+        });
+        main.querySelector("#beads-create-form")?.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          state.detail = await api("/api/beads/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              path: state.selectedPath,
+              title: fd.get("title"),
+              type: fd.get("type"),
+              priority: Number(fd.get("priority")),
+            }),
+          });
+          await refreshFarmsOnly();
+          render();
+        });
+        for (const btn of main.querySelectorAll("[data-bead-claim]")) {
+          btn.addEventListener("click", async () => {
+            state.detail = await api("/api/beads/update", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ path: state.selectedPath, id: btn.dataset.beadClaim, status: "in_progress" }),
+            });
+            await refreshFarmsOnly();
+            render();
+          });
+        }
+        for (const btn of main.querySelectorAll("[data-bead-close]")) {
+          btn.addEventListener("click", async () => {
+            state.detail = await api("/api/beads/close", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ path: state.selectedPath, id: btn.dataset.beadClose }),
+            });
+            await refreshFarmsOnly();
+            render();
+          });
+        }
+        main.querySelector("#btn-just-init")?.addEventListener("click", async () => {
+          state.detail = await api("/api/just/init", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: state.selectedPath }),
+          });
+          await refreshFarmsOnly();
+          render();
+        });
+      }
+
+      for (const btn of main.querySelectorAll("[data-run-just]")) {
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          btn.textContent = "Running...";
+          try {
+            state.justResult = await api("/api/just/run", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ path: state.selectedPath, recipe: btn.dataset.runJust }),
+            });
+            render();
+          } finally {
+            btn.disabled = false;
+          }
+        });
       }
     }
 
@@ -2694,6 +3057,7 @@ const VIEWER_HTML = `<!doctype html>
       state.tab = tab;
       state.gateResult = null;
       state.securityResult = null;
+      state.justResult = null;
       state.view = "farm";
       render();
       state.detail = await api("/api/farm?path=" + encodeURIComponent(farmPath));

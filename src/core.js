@@ -2,11 +2,12 @@ import fs from "fs-extra";
 import path from "path";
 import { execSync, spawnSync } from "child_process";
 
-export const VERSION = "3.1.0";
+export const VERSION = "3.2.0";
 
 const IGNORED_DIRS = new Set([
   "node_modules",
   ".git",
+  ".beads",
   "vendor",
   "dist",
   "build",
@@ -103,12 +104,14 @@ export const FARMWORK_STANDARDS_MD = `# Farmwork v3 Agent Standards
 > Living operational contract for any AI coding agent (Claude Code, Gemini CLI, Codex, Cursor, Antigravity) working on a real software project.
 
 ## Core Principles
-1. **Plan Before Non-Trivial Code** — Save plans to \`_PLANS/<FEATURE_NAME>.md\` using \`farmwork_plan\` (\`action: "create"\`) and get confirmation before large edits.
-2. **Deterministic Truth Over Guesses** — Always call \`farmwork_status\` or \`farmwork_audit\` instead of manually estimating test counts or scores.
-3. **Verify Gates Before Shipping** — Run \`farmwork_gates\` (lint, test, build) and fix failures before committing or claiming work is complete.
-4. **Preserve Architectural Comments** — Remove debug \`console.log\` noise and dead code, but **never** strip comments that explain *why* a non-obvious decision exists.
-5. **Keep Living Docs Honest** — Use \`farmwork_checklist\` as you finish standards items, \`farmwork_garden\` (\`action: "plant"\`) for out-of-scope ideas instead of scope-creeping, and \`farmwork_audit\` after shipping meaningful milestones.
-6. **Repo Is the Source of Truth** — All state lives as plain Markdown + \`.farmwork.json\` inside git so any agent or human can read it with zero lock-in.
+1. **Plan Before Non-Trivial Code** — Save high-level specs to \`_PLANS/<FEATURE_NAME>.md\` using \`farmwork_plan\` (\`action: "create"\`) and get confirmation before large edits.
+2. **Track Execution in Beads (\`bd\`)** — Break active work into dependency-aware tasks with \`bd\` or \`farmwork_beads\` (\`ready\` → claim \`in_progress\` → \`close\` → \`sync\`) so cross-session memory never drops context.
+3. **Use & Maintain the \`justfile\`** — Prefer \`just\` recipes (\`just --list\`, \`just check\`, \`just test\`, \`just dev\`) or \`farmwork_just\` for repeatable speed. Whenever you add or change build/test/dev scripts, update \`justfile\` in the same change.
+4. **Deterministic Truth Over Guesses** — Always call \`farmwork_status\` or \`farmwork_audit\` instead of manually estimating test counts or scores.
+5. **Verify Gates Before Shipping** — Run \`farmwork_gates\` (lint, test, build, security) and fix failures before committing or claiming work is complete.
+6. **Preserve Architectural Comments** — Remove debug \`console.log\` noise and dead code, but **never** strip comments that explain *why* a non-obvious decision exists.
+7. **Keep Living Docs Honest** — Use \`farmwork_checklist\` as you finish standards items, \`farmwork_garden\` (\`action: "plant"\`) for out-of-scope ideas instead of scope-creeping, and \`farmwork_audit\` after shipping meaningful milestones.
+8. **Repo Is the Source of Truth** — All state lives inside git (\`justfile\`, \`.beads/\`, \`.farmwork.json\`, \`_AUDIT/\`, \`_PLANS/\`) with zero hosted lock-in.
 `;
 
 export function todayISO() {
@@ -214,6 +217,8 @@ function isPlaceholderTestScript(cmd) {
 }
 
 let cachedGlobalV3 = null;
+let cachedJustAvailable = null;
+let cachedBeadsAvailable = null;
 
 export function isGlobalFarmworkV3Available() {
   if (cachedGlobalV3 !== null) return cachedGlobalV3;
@@ -224,6 +229,26 @@ export function isGlobalFarmworkV3Available() {
     cachedGlobalV3 = false;
   }
   return cachedGlobalV3;
+}
+
+export function isJustAvailable() {
+  if (cachedJustAvailable !== null) return cachedJustAvailable;
+  try {
+    cachedJustAvailable = spawnSync("just", ["--version"], { stdio: "ignore", timeout: 2500 }).status === 0;
+  } catch {
+    cachedJustAvailable = false;
+  }
+  return cachedJustAvailable;
+}
+
+export function isBeadsAvailable() {
+  if (cachedBeadsAvailable !== null) return cachedBeadsAvailable;
+  try {
+    cachedBeadsAvailable = spawnSync("bd", ["--version"], { stdio: "ignore", timeout: 2500 }).status === 0;
+  } catch {
+    cachedBeadsAvailable = false;
+  }
+  return cachedBeadsAvailable;
 }
 
 function detectNodeStack(dir, pkg) {
@@ -977,6 +1002,543 @@ export function completePlan(cwd, slugOrTitle) {
 }
 
 /* ============================================================================
+   Justfile Command Runner Integration (https://just.systems)
+   ============================================================================ */
+
+const JUSTFILE_NAMES = ["justfile", "Justfile", ".justfile", ".Justfile"];
+const JUST_KEYWORDS = new Set(["set", "alias", "export", "import", "mod", "unexport"]);
+
+export function findJustfile(cwd) {
+  const dir = resolveProjectPath(cwd);
+  for (const name of JUSTFILE_NAMES) {
+    const full = path.join(dir, name);
+    if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+      return { file: name, fullPath: full };
+    }
+  }
+  return null;
+}
+
+export function parseJustfileContent(content) {
+  const lines = String(content || "").split(/\r?\n/);
+  const recipes = [];
+  let pendingComment = null;
+  let pendingAttrs = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+
+    if (!trimmed) {
+      pendingComment = null;
+      pendingAttrs = [];
+      continue;
+    }
+
+    // Indented lines belong to a recipe body
+    if (/^[ \t]/.test(raw)) {
+      continue;
+    }
+
+    if (trimmed.startsWith("#")) {
+      const text = trimmed.replace(/^#+\s*/, "").trim();
+      if (text && !/^[-=─═]{3,}/.test(text)) {
+        pendingComment = text;
+      }
+      continue;
+    }
+
+    if (/^\[[^\]]+\]$/.test(trimmed)) {
+      pendingAttrs.push(trimmed.slice(1, -1).trim());
+      continue;
+    }
+
+    // Variable assignment (`FOO := "bar"`) or global directive (`set ...`)
+    if (/^[A-Za-z_][A-Za-z0-9_-]*\s*:=/.test(trimmed)) {
+      pendingComment = null;
+      pendingAttrs = [];
+      continue;
+    }
+
+    const firstWord = trimmed.split(/\s+/)[0];
+    if (JUST_KEYWORDS.has(firstWord)) {
+      pendingComment = null;
+      pendingAttrs = [];
+      continue;
+    }
+
+    // Recipe header: optional `@`, name, optional params, `:`, optional deps
+    const recipeMatch = trimmed.match(/^(@?)([A-Za-z_][A-Za-z0-9_-]*)([^:=]*):(?!=)\s*(.*)$/);
+    if (recipeMatch) {
+      const name = recipeMatch[2];
+      const rawParams = recipeMatch[3].trim();
+      const rawDeps = recipeMatch[4].trim();
+      const isPrivate = name.startsWith("_") || pendingAttrs.some((a) => /^private\b/i.test(a));
+      const isDefault = pendingAttrs.some((a) => /^default\b/i.test(a));
+      let docAttr = null;
+      for (const a of pendingAttrs) {
+        const m = a.match(/^doc\(["'](.+)["']\)$/i);
+        if (m) docAttr = m[1];
+      }
+      recipes.push({
+        name,
+        params: rawParams ? rawParams.split(/\s+/).filter(Boolean) : [],
+        deps: rawDeps ? rawDeps.split(/\s+/).filter(Boolean) : [],
+        description: docAttr || pendingComment || "",
+        isDefault: isDefault || (recipes.length === 0 && !isPrivate),
+        isPrivate,
+        line: i + 1,
+      });
+    }
+
+    pendingComment = null;
+    pendingAttrs = [];
+  }
+
+  return recipes;
+}
+
+export function detectJustfile(cwd) {
+  const dir = resolveProjectPath(cwd);
+  const found = findJustfile(dir);
+  const installed = isJustAvailable();
+  if (!found) {
+    return { installed, exists: false, file: null, path: null, recipes: [], allRecipesCount: 0 };
+  }
+  const content = fs.readFileSync(found.fullPath, "utf8");
+  const all = parseJustfileContent(content);
+  const publicRecipes = all.filter((r) => !r.isPrivate);
+  return {
+    installed,
+    exists: true,
+    file: found.file,
+    path: found.fullPath,
+    recipes: publicRecipes,
+    allRecipesCount: all.length,
+  };
+}
+
+function detectDevCommand(dir, project) {
+  if (project.stack === "rails") {
+    return fs.existsSync(path.join(dir, "bin", "dev")) ? "bin/dev" : "bin/rails server";
+  }
+  if (fs.existsSync(path.join(dir, "package.json"))) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
+      const pm = project.packageManager || "npm";
+      if (pkg.scripts?.dev) return `${pm} run dev`;
+      if (pkg.scripts?.start) return `${pm} run start`;
+    } catch {
+      // ignore
+    }
+  }
+  if (project.stack === "rust") return "cargo run";
+  if (project.stack === "go") return "go run .";
+  return null;
+}
+
+export function buildStarterJustfile(cwd, project = null) {
+  const dir = resolveProjectPath(cwd);
+  const proj = project || detectProject(dir);
+  const devCmd = detectDevCommand(dir, proj);
+  const lines = [
+    `# ${proj.projectName} — Maintained Justfile (https://just.systems)`,
+    `# Keep these recipes accurate whenever scripts or workflows evolve.`,
+    ``,
+    `set shell := ["bash", "-cu"]`,
+    `set dotenv-load`,
+    ``,
+    `# Show all available recipes`,
+    `[default]`,
+    `help:`,
+    `    @just --list --unsorted`,
+    ``,
+  ];
+
+  if (devCmd) {
+    lines.push(`# Start local development server`, `dev:`, `    ${devCmd}`, ``);
+  }
+  if (proj.commands.lint) {
+    lines.push(`# Run linter / static checks`, `lint:`, `    ${proj.commands.lint}`, ``);
+  }
+  if (proj.commands.test) {
+    lines.push(`# Run automated test suite`, `test:`, `    ${proj.commands.test}`, ``);
+  }
+  if (proj.commands.build) {
+    lines.push(`# Build the project`, `build:`, `    ${proj.commands.build}`, ``);
+  }
+
+  lines.push(
+    `# Run full quality & security verification gates`,
+    `check:`,
+    `    farmwork gates`,
+    ``,
+    `# Run deterministic secrets & dependency security scan`,
+    `security:`,
+    `    farmwork security`,
+    ``,
+    `# Refresh _AUDIT/FARMHOUSE.md and tend the Idea Garden`,
+    `audit:`,
+    `    farmwork audit`,
+    ``,
+    `# Show project health score & status`,
+    `status:`,
+    `    farmwork status`,
+    ``,
+    `# Open the Local Farm Viewer in your browser`,
+    `view:`,
+    `    farmwork view`,
+    ``,
+    `# Show unblocked Beads issues ready to work on`,
+    `ready:`,
+    `    bd ready`,
+    ``,
+    `# List open Beads issues`,
+    `issues:`,
+    `    bd list --status open`,
+    ``,
+    `# Sync Beads issue graph with git/remote`,
+    `sync:`,
+    `    bd sync`,
+    ``,
+  );
+
+  return lines.join("\n");
+}
+
+export function initJustfile(cwd, { force = false } = {}) {
+  const dir = resolveProjectPath(cwd);
+  assertWritableV3(dir);
+  const existing = findJustfile(dir);
+  if (existing && !force) {
+    const info = detectJustfile(dir);
+    return { created: false, skipped: true, file: existing.file, recipes: info.recipes };
+  }
+  const content = buildStarterJustfile(dir);
+  const targetPath = path.join(dir, existing?.file || "justfile");
+  fs.writeFileSync(targetPath, content);
+  const info = detectJustfile(dir);
+  return { created: true, skipped: false, file: path.basename(targetPath), path: targetPath, recipes: info.recipes };
+}
+
+export function runJustRecipe(cwd, recipe, { args = [], timeoutMs = 120000 } = {}) {
+  const dir = resolveProjectPath(cwd);
+  const cleanRecipe = String(recipe || "").trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(cleanRecipe)) {
+    throw new Error(`Invalid just recipe name: "${recipe}"`);
+  }
+  if (!isJustAvailable()) {
+    throw new Error("`just` is not installed. Install from https://just.systems/man/en/");
+  }
+  const info = detectJustfile(dir);
+  if (!info.exists) {
+    throw new Error("No justfile found in this repository. Run `farmwork just --init` first.");
+  }
+  const matched = info.recipes.find((r) => r.name === cleanRecipe);
+  if (!matched) {
+    throw new Error(`Recipe "${cleanRecipe}" not found in ${info.file}.`);
+  }
+  const safeArgs = Array.isArray(args) ? args.map((a) => String(a)) : [];
+  const start = Date.now();
+  const res = spawnSync("just", [cleanRecipe, ...safeArgs], {
+    cwd: dir,
+    shell: false,
+    encoding: "utf8",
+    timeout: timeoutMs,
+    maxBuffer: 1024 * 1024 * 4,
+  });
+  const durationMs = Date.now() - start;
+  const combined = `${res.stdout || ""}\n${res.stderr || ""}`.trim();
+  const tail = combined.split("\n").slice(-50).join("\n");
+  return {
+    recipe: cleanRecipe,
+    command: `just ${[cleanRecipe, ...safeArgs].join(" ")}`,
+    passed: res.status === 0,
+    exitCode: res.status,
+    durationMs,
+    output: tail,
+  };
+}
+
+/* ============================================================================
+   Beads Issue & Dependency Graph Integration (https://beads.gascity.com)
+   ============================================================================ */
+
+function extractJsonOutput(text) {
+  const str = String(text || "").trim();
+  if (!str) return null;
+  try {
+    return JSON.parse(str);
+  } catch {
+    // bd occasionally emits a leading warning line before JSON output
+    const idxObj = str.indexOf("{");
+    const idxArr = str.indexOf("[");
+    const candidates = [idxObj, idxArr].filter((n) => n >= 0);
+    if (candidates.length === 0) return null;
+    const start = Math.min(...candidates);
+    try {
+      return JSON.parse(str.slice(start));
+    } catch {
+      return null;
+    }
+  }
+}
+
+function readBeadsJsonlFallback(beadsDir) {
+  const jsonlPath = path.join(beadsDir, "issues.jsonl");
+  if (!fs.existsSync(jsonlPath)) return null;
+  try {
+    const lines = fs.readFileSync(jsonlPath, "utf8").split("\n").filter((l) => l.trim());
+    const issues = [];
+    for (const line of lines) {
+      try {
+        issues.push(JSON.parse(line));
+      } catch {
+        // ignore malformed line
+      }
+    }
+    const open = issues.filter((i) => i.status === "open").length;
+    const inProgress = issues.filter((i) => i.status === "in_progress").length;
+    const blocked = issues.filter((i) => i.status === "blocked").length;
+    const closed = issues.filter((i) => i.status === "closed").length;
+    const readyList = issues.filter((i) => i.status === "open" || i.status === "in_progress");
+    return {
+      summary: {
+        total: issues.length,
+        open,
+        inProgress,
+        blocked,
+        ready: readyList.length,
+        closed,
+      },
+      ready: readyList.slice(0, 25),
+      issues: issues.slice(0, 50),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function runBdJson(dir, args, timeoutMs = 4000) {
+  const res = spawnSync("bd", [...args, "--json"], {
+    cwd: dir,
+    shell: false,
+    encoding: "utf8",
+    timeout: timeoutMs,
+    maxBuffer: 1024 * 1024 * 4,
+  });
+  const parsed = extractJsonOutput(res.stdout);
+  return { ok: res.status === 0, status: res.status, data: parsed, stdout: res.stdout || "", stderr: res.stderr || "" };
+}
+
+export function getBeadsState(cwd, { includeIssues = true } = {}) {
+  const dir = resolveProjectPath(cwd);
+  const beadsDir = path.join(dir, ".beads");
+  const installed = isBeadsAvailable();
+  const initialized = fs.existsSync(beadsDir);
+
+  const empty = {
+    installed,
+    initialized,
+    summary: { total: 0, open: 0, inProgress: 0, blocked: 0, ready: 0, closed: 0 },
+    ready: [],
+    issues: [],
+  };
+
+  if (!initialized) return empty;
+
+  if (installed) {
+    const st = runBdJson(dir, ["status"], 3500);
+    if (st.ok && st.data?.summary) {
+      const s = st.data.summary;
+      const summary = {
+        total: Number(s.total_issues || 0),
+        open: Number(s.open_issues || 0),
+        inProgress: Number(s.in_progress_issues || 0),
+        blocked: Number(s.blocked_issues || 0),
+        ready: Number(s.ready_issues || 0),
+        closed: Number(s.closed_issues || 0),
+      };
+      let ready = [];
+      let issues = [];
+      if (includeIssues) {
+        const r = runBdJson(dir, ["ready", "--limit", "25"], 3500);
+        if (r.ok && Array.isArray(r.data)) ready = r.data;
+        const l = runBdJson(dir, ["list", "--limit", "50"], 3500);
+        if (l.ok && Array.isArray(l.data)) issues = l.data;
+      }
+      return { installed: true, initialized: true, summary, ready, issues };
+    }
+  }
+
+  const fallback = readBeadsJsonlFallback(beadsDir);
+  if (fallback) {
+    return {
+      installed,
+      initialized: true,
+      summary: fallback.summary,
+      ready: includeIssues ? fallback.ready : [],
+      issues: includeIssues ? fallback.issues : [],
+    };
+  }
+
+  return empty;
+}
+
+function makeBeadsPrefix(projectName) {
+  const clean = String(projectName || "fw")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 6);
+  if (!clean || clean === "test") return "fw";
+  return clean;
+}
+
+export function initBeads(cwd, { prefix = null } = {}) {
+  const dir = resolveProjectPath(cwd);
+  assertWritableV3(dir);
+  if (fs.existsSync(path.join(dir, ".beads"))) {
+    return { initialized: true, created: false, reason: "Beads already initialized in .beads/" };
+  }
+  if (!isBeadsAvailable()) {
+    return {
+      initialized: false,
+      created: false,
+      reason: "Beads CLI (`bd`) is not installed. Install from https://beads.gascity.com/",
+    };
+  }
+  const project = detectProject(dir);
+  const safePrefix = String(prefix || makeBeadsPrefix(project.projectName))
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "") || "fw";
+
+  let res = spawnSync("bd", ["init", "--prefix", safePrefix, "--quiet"], {
+    cwd: dir,
+    shell: false,
+    encoding: "utf8",
+    timeout: 15000,
+  });
+  if (res.status !== 0 && /unknown flag.*--quiet/i.test(res.stderr || "")) {
+    res = spawnSync("bd", ["init", "--prefix", safePrefix], {
+      cwd: dir,
+      shell: false,
+      encoding: "utf8",
+      timeout: 15000,
+    });
+  }
+  if (res.status !== 0) {
+    throw new Error(`bd init failed: ${(res.stderr || res.stdout || "").trim()}`);
+  }
+  return { initialized: true, created: true, prefix: safePrefix };
+}
+
+export function runBeadsAction(
+  cwd,
+  { action = "status", id, title, type = "task", priority = 2, description, parent, status, assignee, reason, blockerId, prefix, limit } = {},
+) {
+  const dir = resolveProjectPath(cwd);
+  const cleanAction = String(action || "status").trim().toLowerCase();
+
+  if (cleanAction === "status") {
+    return getBeadsState(dir, { includeIssues: false });
+  }
+  if (cleanAction === "ready") {
+    const state = getBeadsState(dir, { includeIssues: true });
+    return { installed: state.installed, initialized: state.initialized, summary: state.summary, ready: state.ready };
+  }
+  if (cleanAction === "list") {
+    if (!fs.existsSync(path.join(dir, ".beads"))) {
+      return getBeadsState(dir, { includeIssues: false });
+    }
+    if (!isBeadsAvailable()) {
+      return getBeadsState(dir, { includeIssues: true });
+    }
+    const args = ["list", "--limit", String(Number(limit) || 50)];
+    if (status) args.push("--status", String(status));
+    if (type) args.push("--type", String(type));
+    const res = runBdJson(dir, args, 5000);
+    if (!res.ok) throw new Error(`bd list failed: ${(res.stderr || res.stdout).trim()}`);
+    return { issues: Array.isArray(res.data) ? res.data : [] };
+  }
+
+  // Mutating operations enforce v3 protection & require bd CLI
+  assertWritableV3(dir);
+  if (cleanAction === "init") {
+    return initBeads(dir, { prefix });
+  }
+  if (!isBeadsAvailable()) {
+    throw new Error("Beads CLI (`bd`) is not installed. Install from https://beads.gascity.com/");
+  }
+  if (!fs.existsSync(path.join(dir, ".beads"))) {
+    throw new Error("Beads is not initialized in this repo. Run `bd init` or `farmwork_beads` with action='init'.");
+  }
+
+  if (cleanAction === "create") {
+    const cleanTitle = String(title || "").trim();
+    if (!cleanTitle) throw new Error("Issue title is required for beads create.");
+    const args = ["create", cleanTitle, "-t", String(type || "task"), "-p", String(Number.isFinite(Number(priority)) ? Number(priority) : 2)];
+    if (description) args.push("--description", String(description));
+    if (parent) args.push("--parent", String(parent));
+    const res = runBdJson(dir, args, 8000);
+    if (!res.ok) throw new Error(`bd create failed: ${(res.stderr || res.stdout).trim()}`);
+    return { created: true, issue: res.data || { title: cleanTitle } };
+  }
+
+  if (cleanAction === "update" || cleanAction === "claim") {
+    const cleanId = String(id || "").trim();
+    if (!cleanId) throw new Error("Issue id is required for beads update.");
+    const args = ["update", cleanId];
+    if (cleanAction === "claim" && !status) {
+      args.push("--status", "in_progress");
+    } else if (status) {
+      args.push("--status", String(status));
+    }
+    if (priority !== undefined && priority !== null) args.push("--priority", String(priority));
+    if (assignee) args.push("--assignee", String(assignee));
+    const res = runBdJson(dir, args, 8000);
+    if (!res.ok) throw new Error(`bd update failed: ${(res.stderr || res.stdout).trim()}`);
+    return { updated: true, id: cleanId, issue: res.data };
+  }
+
+  if (cleanAction === "close") {
+    const cleanId = String(id || "").trim();
+    if (!cleanId) throw new Error("Issue id is required for beads close.");
+    const args = ["close", cleanId];
+    if (reason) args.push("--reason", String(reason));
+    const res = runBdJson(dir, args, 8000);
+    if (!res.ok) throw new Error(`bd close failed: ${(res.stderr || res.stdout).trim()}`);
+    return { closed: true, id: cleanId, issue: res.data };
+  }
+
+  if (cleanAction === "dep") {
+    const cleanId = String(id || "").trim();
+    const cleanBlocker = String(blockerId || "").trim();
+    if (!cleanId || !cleanBlocker) throw new Error("Both `id` and `blockerId` are required to add a dependency.");
+    const res = spawnSync("bd", ["dep", "add", cleanId, cleanBlocker], {
+      cwd: dir,
+      shell: false,
+      encoding: "utf8",
+      timeout: 8000,
+    });
+    if (res.status !== 0) throw new Error(`bd dep add failed: ${(res.stderr || res.stdout).trim()}`);
+    return { linked: true, id: cleanId, blockedBy: cleanBlocker, output: (res.stdout || "").trim() };
+  }
+
+  if (cleanAction === "sync") {
+    const res = spawnSync("bd", ["sync"], {
+      cwd: dir,
+      shell: false,
+      encoding: "utf8",
+      timeout: 15000,
+    });
+    if (res.status !== 0) throw new Error(`bd sync failed: ${(res.stderr || res.stdout).trim()}`);
+    return { synced: true, output: `${res.stdout || ""}\n${res.stderr || ""}`.trim() };
+  }
+
+  throw new Error(`Unknown beads action "${action}". Use: status, ready, list, create, update, claim, close, dep, sync, init.`);
+}
+
+/* ============================================================================
    Deterministic Health Score, Audit & Quality Gates
    ============================================================================ */
 
@@ -990,6 +1552,8 @@ export function computeHealth(cwd, { assumeFarmhouse = false } = {}) {
   const compost = parseCompost(dir);
   const checklist = parseChecklist(dir);
   const plans = listPlans(dir);
+  const justfile = detectJustfile(dir);
+  const beads = getBeadsState(dir, { includeIssues: false });
 
   const hasAgentsMd = fs.existsSync(path.join(dir, "AGENTS.md"));
   const hasClaudeMd = fs.existsSync(path.join(dir, "CLAUDE.md"));
@@ -1093,6 +1657,8 @@ export function computeHealth(cwd, { assumeFarmhouse = false } = {}) {
     status,
     breakdown,
     pillars: parsePillarAudits(dir),
+    justfile,
+    beads,
     metrics: {
       testFiles,
       totalPlans: plans.length,
@@ -1103,6 +1669,10 @@ export function computeHealth(cwd, { assumeFarmhouse = false } = {}) {
       checklistPercent: checklist.summary.percent,
       checklistCompleted: checklist.summary.completed,
       checklistActive: checklist.summary.activeTotal || 0,
+      justRecipes: justfile.recipes.length,
+      beadsReady: beads.summary.ready,
+      beadsOpen: beads.summary.open + beads.summary.inProgress,
+      beadsClosed: beads.summary.closed,
     },
     files: {
       manifest: project.hasManifest,
@@ -1110,6 +1680,8 @@ export function computeHealth(cwd, { assumeFarmhouse = false } = {}) {
       agentsMd: hasAgentsMd,
       claudeMd: hasClaudeMd,
       mcpConfig: hasMcpConfig,
+      justfile: justfile.exists,
+      beads: beads.initialized,
       farmhouse: hasFarmhouse,
       garden: garden.exists,
       compost: compost.exists,
@@ -1179,6 +1751,8 @@ export function runAudit(cwd) {
 | Plans | ${health.metrics.completedPlans} / ${health.metrics.totalPlans} complete |
 | Active Ideas | ${health.metrics.activeIdeas} (${health.metrics.wiltingIdeas} wilting) |
 | Composted Ideas | ${health.metrics.compostedIdeas} |
+| Beads Issues | ${health.beads.initialized ? `${health.beads.summary.ready} ready · ${health.beads.summary.open + health.beads.summary.inProgress} open · ${health.beads.summary.closed} closed` : "not initialized"} |
+| Justfile | ${health.justfile.exists ? `\`${health.justfile.file}\` (${plural(health.justfile.recipes.length, "recipe")})` : "not present"} |
 | Git Branch | \`${health.git.branch || "n/a"}\` (${health.git.dirtyCount} uncommitted) |
 
 ---
@@ -1656,6 +2230,8 @@ function buildStarterChecklist(name, stack) {
 
 ## Foundation
 - [x] Farmwork v3 initialized (\`.farmwork.json\` & \`AGENTS.md\`)
+- [ ] \`justfile\` maintained with accurate dev, lint, test, and build recipes
+- [ ] Active tasks & dependencies tracked in Beads (\`bd ready\` / \`bd sync\`)
 - [ ] README documents local setup and architecture
 - [ ] Environment variables documented in \`.env.example\`
 
@@ -1673,7 +2249,15 @@ ${stackSection}
 
 export function initProject(
   cwd,
-  { force = false, reinstall = false, projectName = null, includeMcpConfig = true, useNpx = false } = {},
+  {
+    force = false,
+    reinstall = false,
+    projectName = null,
+    includeMcpConfig = true,
+    includeJustfile = true,
+    includeBeads = true,
+    useNpx = false,
+  } = {},
 ) {
   const dir = resolveProjectPath(cwd);
   const install = detectFarmworkInstall(dir);
@@ -1730,42 +2314,49 @@ export function initProject(
   // 2. AGENTS.md (universal source of truth for Claude, Gemini, Codex, Cursor, Antigravity)
   const agentsMd = `# ${name} — Farmwork Agent Instructions
 
-This repository uses **Farmwork v3** — an agent-first standards and workflow system powered by MCP.
+This repository uses **Farmwork v3** — an agent-first standards, task-graph (Beads), and command-runner (Justfile) workflow powered by MCP.
 
 ## How to Work on This Project
 
-Connect to the \`farmwork\` MCP server (configured in \`.mcp.json\`) and use its 6 tools directly:
+Connect to the \`farmwork\` MCP server (configured in \`.mcp.json\`) and use its tools directly:
 
-| Goal | MCP Tool |
-|------|----------|
-| Check project health & git status | \`farmwork_status\` |
-| Refresh \`_AUDIT/FARMHOUSE.md\` & age Idea Garden | \`farmwork_audit\` |
-| Run lint, test, and build quality gates | \`farmwork_gates\` |
+| Goal | MCP Tool / CLI |
+|------|----------------|
+| Check project health, Beads & Justfile status | \`farmwork_status\` / \`just status\` |
+| Refresh \`_AUDIT/FARMHOUSE.md\` or save lazy Pillar Audits | \`farmwork_audit\` / \`just audit\` |
+| Run lint, test, build & secrets security gates | \`farmwork_gates\` / \`just check\` |
+| Track tasks & dependency graph (Beads) | \`farmwork_beads\` / \`bd ready\`, \`bd create\`, \`bd close\`, \`bd sync\` |
+| List or run maintained \`justfile\` recipes | \`farmwork_just\` / \`just --list\` |
 | List or update \`_AUDIT/CHECKLIST.md\` | \`farmwork_checklist\` (\`list\` / \`complete\` / \`pending\` / \`skip\` / \`add\`) |
 | List, plant, or compost ideas in \`_AUDIT/GARDEN.md\` | \`farmwork_garden\` (\`list\` / \`plant\` / \`compost\`) |
 | List, create, or complete plans in \`_PLANS/\` | \`farmwork_plan\` (\`list\` / \`create\` / \`complete\`) |
 
-## Standards
+## Workflow & Standards
 
-1. **Plan First:** For any non-trivial feature or refactor, call \`farmwork_plan\` (\`action: "create"\`) to save a plan in \`_PLANS/\` and confirm with the user before implementing.
-2. **Quality Gates:** Run \`farmwork_gates\` before shipping. Never claim tests or builds pass without running them.
-3. **Preserve "Why" Comments:** Clean up debug logs and dead code, but keep comments that explain non-obvious architectural decisions.
-4. **Capture, Don't Creep:** Plant out-of-scope improvements into \`_AUDIT/GARDEN.md\` with \`farmwork_garden\` (\`action: "plant"\`) rather than expanding the current diff.
-5. **Local Viewer:** Run \`farmwork view\` to inspect all Markdown docs, checklists, and health scores locally in a browser.
+1. **Plan First:** For any non-trivial feature or refactor, call \`farmwork_plan\` (\`action: "create"\`) to save a spec in \`_PLANS/\` and confirm with the user before implementing.
+2. **Track Execution in Beads (\`bd\`):** Break active work into tracked issues with \`bd create\` / \`farmwork_beads\`. Start sessions with \`bd ready\`, claim active work (\`in_progress\`), close finished beads with a reason, and run \`bd sync\` before ending a session.
+3. **Use & Maintain the \`justfile\`:** Run repeatable tasks via \`just\` (\`just --list\`, \`just check\`, \`just test\`, \`just dev\`). Whenever you add or change project scripts, flags, or workflows, update \`justfile\` so it stays fast and trustworthy.
+4. **Quality & Security Gates:** Run \`farmwork_gates\` (or \`just check\`) before shipping. Never claim tests or builds pass without running them.
+5. **Preserve "Why" Comments:** Clean up debug logs and dead code, but keep comments that explain non-obvious architectural decisions.
+6. **Capture, Don't Creep:** Plant out-of-scope improvements into \`_AUDIT/GARDEN.md\` with \`farmwork_garden\` (\`action: "plant"\`) rather than expanding the current diff.
+7. **Local Viewer:** Run \`farmwork view\` (or \`just view\`) to inspect docs, checklists, Beads, and Justfile recipes locally.
 
 ## Project Commands
 
 - **Stack:** \`${detected.stack}\`
+- **Justfile:** Run \`just --list\` for all project recipes
 - **Lint:** ${detected.commands.lint ? `\`${detected.commands.lint}\`` : "_not configured_"}
 - **Test:** ${detected.commands.test ? `\`${detected.commands.test}\`` : "_not configured_"}
 - **Build:** ${detected.commands.build ? `\`${detected.commands.build}\`` : "_not configured_"}
 
 ## Structure
 
+- \`justfile\` — Maintained project & Farmwork command recipes (\`just --list\`)
+- \`.beads/\` — Git-backed Beads issue & dependency graph (\`bd ready\`, \`bd sync\`)
 - \`.farmwork.json\` — Project manifest, detected commands & last gate verification
 - \`_AUDIT/FARMHOUSE.md\` — Deterministic project health & audit history
 - \`_AUDIT/CHECKLIST.md\` — Living engineering standards checklist
-- \`_AUDIT/GARDEN.md\` — Pre-plan idea nursery (\`_AUDIT/COMPOST.md\` is created automatically when ideas retire)
+- \`_AUDIT/GARDEN.md\` — Pre-plan idea nursery (\`COMPOST.md\` & pillar reports created lazily on demand)
 - \`_PLANS/\` — Feature implementation plans
 `;
   writeManaged("AGENTS.md", agentsMd, { overwriteOnReinstall: true });
@@ -1775,7 +2366,7 @@ Connect to the \`farmwork\` MCP server (configured in \`.mcp.json\`) and use its
 
 Read and follow [AGENTS.md](./AGENTS.md).
 
-This project uses the **Farmwork v3** MCP server (\`.mcp.json\`) for deterministic audits, checklists, plans, Idea Garden tracking, and quality gates.
+This project uses **Farmwork v3** (MCP server in \`.mcp.json\`), **Beads** (\`bd ready\` / \`bd sync\`), and a maintained **\`justfile\`** (\`just --list\`) for deterministic audits, task tracking, checklists, plans, and quality gates.
 `;
   writeManaged("CLAUDE.md", claudeMd, { overwriteOnReinstall: true });
 
@@ -1840,7 +2431,38 @@ _No ideas planted yet. Use \`farmwork_garden\` (\`action: "plant"\`) to plant an
   // 6. _AUDIT/CHECKLIST.md (stack-aware starter standards)
   writeManaged("_AUDIT/CHECKLIST.md", buildStarterChecklist(name, detected.stack));
 
-  // 8. Run initial deterministic audit to populate _AUDIT/FARMHOUSE.md
+  // 7. Stack-aware maintained justfile (never overwrites an existing hand-crafted justfile unless --force)
+  if (includeJustfile) {
+    const existingJust = findJustfile(dir);
+    if (existingJust && !force) {
+      skipped.push(existingJust.file);
+    } else {
+      const jfName = existingJust?.file || "justfile";
+      fs.writeFileSync(path.join(dir, jfName), buildStarterJustfile(dir, { ...detected, projectName: name }));
+      created.push(jfName);
+    }
+  }
+
+  // 8. Beads (.beads/) initialization (only in git repos when `bd` is installed & not already initialized)
+  let beadsNote = null;
+  if (includeBeads) {
+    if (fs.existsSync(path.join(dir, ".beads"))) {
+      skipped.push(".beads/");
+    } else if (!isBeadsAvailable()) {
+      beadsNote = "Beads CLI (`bd`) not installed — install from https://beads.gascity.com/ and run `bd init`";
+    } else if (!fs.existsSync(path.join(dir, ".git"))) {
+      beadsNote = "Not a git repo yet — run `git init && bd init` to enable Beads task tracking";
+    } else {
+      try {
+        const bdRes = initBeads(dir);
+        if (bdRes.created) created.push(".beads/");
+      } catch (err) {
+        beadsNote = `Beads init skipped (${err instanceof Error ? err.message : String(err)})`;
+      }
+    }
+  }
+
+  // 9. Run initial deterministic audit to populate _AUDIT/FARMHOUSE.md
   const hadFarmhouse = fs.existsSync(path.join(dir, "_AUDIT", "FARMHOUSE.md"));
   const audit = runAudit(dir);
   created.push(hadFarmhouse ? "_AUDIT/FARMHOUSE.md (refreshed)" : "_AUDIT/FARMHOUSE.md");
@@ -1854,6 +2476,7 @@ _No ideas planted yet. Use \`farmwork_garden\` (\`action: "plant"\`) to plant an
     commands: detected.commands,
     created,
     skipped,
+    beadsNote,
     health: audit.health,
   };
 }
@@ -1884,6 +2507,18 @@ export function readFarmDocs(cwd) {
 
   for (const rootDoc of ["AGENTS.md", "CLAUDE.md", "README.md"]) {
     addFile(rootDoc, "Root");
+  }
+  const justFound = findJustfile(dir);
+  if (justFound) {
+    const stat = fs.statSync(justFound.fullPath);
+    docs.push({
+      path: justFound.file,
+      name: justFound.file,
+      category: "Root",
+      title: `Justfile (${justFound.file})`,
+      updatedAt: stat.mtime.toISOString(),
+      content: "```makefile\n" + fs.readFileSync(justFound.fullPath, "utf8") + "\n```",
+    });
   }
 
   const scanDir = (subDir, category) => {

@@ -22,6 +22,18 @@ export async function doctor(options = {}) {
     { label: "_AUDIT/GARDEN.md", passed: health.files.garden, fix: repairCmd },
     { label: "_PLANS/ directory", passed: health.files.plansDir, fix: repairCmd },
     {
+      label: "Maintained justfile present",
+      passed: Boolean(health.justfile?.exists),
+      fix: "Run `farmwork just --init` (install `just` from https://just.systems/man/en/)",
+    },
+    {
+      label: "Beads (.beads/) task graph initialized",
+      passed: Boolean(health.beads?.initialized),
+      fix: health.beads?.installed
+        ? "Run `farmwork beads --init` (or `bd init`)"
+        : "Install `bd` from https://beads.gascity.com/ then run `bd init`",
+    },
+    {
       label: "Automated test files detected",
       passed: health.metrics.testFiles > 0,
       fix: `Add tests for stack "${health.stack}"`,

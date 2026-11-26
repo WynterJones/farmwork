@@ -1,5 +1,13 @@
 import readline from "node:readline/promises";
-import { VERSION, detectFarmworkInstall, detectProject, initProject } from "./core.js";
+import {
+  VERSION,
+  detectFarmworkInstall,
+  detectProject,
+  detectJustfile,
+  isJustAvailable,
+  isBeadsAvailable,
+  initProject,
+} from "./core.js";
 import { farmTerm, emojis } from "./terminal.js";
 
 async function askConfirm(question, defaultYes = true) {
@@ -45,12 +53,29 @@ export async function init(options = {}) {
   }
 
   const detected = detectProject(cwd, { ignoreManifest: Boolean(options.reinstall || options.force) });
+  const justInfo = detectJustfile(cwd);
   farmTerm.section("Detected Project", emojis.seedling);
   farmTerm.kv("Project", detected.projectName);
   farmTerm.kv("Stack", detected.stack);
   farmTerm.kv("Lint", detected.commands.lint || "(none)");
   farmTerm.kv("Test", detected.commands.test || "(none)");
   farmTerm.kv("Build", detected.commands.build || "(none)");
+  farmTerm.kv(
+    "Justfile",
+    justInfo.exists
+      ? `${justInfo.file} (${justInfo.recipes.length} recipes)`
+      : options.justfile === false
+        ? "skipped (--no-justfile)"
+        : `will generate (${isJustAvailable() ? "just installed" : "install from just.systems"})`,
+  );
+  farmTerm.kv(
+    "Beads (bd)",
+    options.beads === false
+      ? "skipped (--no-beads)"
+      : isBeadsAvailable()
+        ? "bd installed (ready to initialize)"
+        : "not installed (beads.gascity.com)",
+  );
 
   let projectName = detected.projectName;
   const isInteractive = Boolean(process.stdin.isTTY) && !options.force && !options.yes;
@@ -84,6 +109,8 @@ export async function init(options = {}) {
     useNpx: Boolean(options.npx),
     projectName,
     includeMcpConfig: options.mcp !== false,
+    includeJustfile: options.justfile !== false,
+    includeBeads: options.beads !== false,
   });
 
   if (result.blocked) {
@@ -97,6 +124,9 @@ export async function init(options = {}) {
   for (const f of result.skipped) {
     const hint = f === "AGENTS.md" || f === "CLAUDE.md" ? "kept existing — add Farmwork MCP note or pass --force" : "kept existing";
     farmTerm.dim(`  • ${f} (${hint})`);
+  }
+  if (result.beadsNote) {
+    farmTerm.dim(`  • Beads: ${result.beadsNote}`);
   }
 
   if (result.reinstalledFrom && result.legacyFiles.length > 0) {
@@ -112,6 +142,6 @@ export async function init(options = {}) {
 
   farmTerm.section("Next Steps");
   farmTerm.info("1. Connect your AI agent via MCP (.mcp.json already wired)");
-  farmTerm.info("2. Run `farmwork gates` to verify lint/test/build and earn gate points");
-  farmTerm.info("3. View all living docs & checklists locally with `farmwork view`\n");
+  farmTerm.info("2. Run `just` to see all recipes, `just check` to verify gates, and `bd ready` for tasks");
+  farmTerm.info("3. View living docs, checklists, Beads & Justfile locally with `farmwork view`\n");
 }

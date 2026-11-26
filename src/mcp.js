@@ -22,6 +22,11 @@ import {
   parseChecklist,
   setChecklistItem,
   addChecklistItem,
+  findJustfile,
+  detectJustfile,
+  initJustfile,
+  runJustRecipe,
+  runBeadsAction,
 } from "./core.js";
 
 function jsonResult(data) {
@@ -47,14 +52,14 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
   });
 
   /* ------------------------------------------------------------------------
-     TOOLS (6 lean, deterministic agent-first tools — low token footprint)
+     TOOLS (8 lean, deterministic agent-first tools — low token footprint)
      ------------------------------------------------------------------------ */
 
   server.registerTool(
     "farmwork_status",
     {
       description:
-        "Get deterministic Farmwork project health score (0-10), breakdown, detected stack/commands, polyglot test count, last quality gate results, checklist %, Idea Garden counts, plans, and git state.",
+        "Get deterministic Farmwork project health score (0-10), breakdown, pillar scores, Beads issue summary, Justfile recipes, detected stack/commands, polyglot test count, last quality gate results, checklist %, Idea Garden counts, plans, and git state.",
       inputSchema: {
         projectPath: z.string().optional().describe("Path to the project directory (defaults to server cwd)"),
       },
@@ -229,8 +234,82 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
     },
   );
 
+  server.registerTool(
+    "farmwork_beads",
+    {
+      description:
+        "Track project issues & dependency graphs via Beads (`bd`). Actions: 'status', 'ready' (unblocked next work), 'list', 'create', 'claim' (set in_progress), 'update', 'close', 'dep' (add blocker), 'sync', or 'init'.",
+      inputSchema: {
+        action: z
+          .enum(["status", "ready", "list", "create", "claim", "update", "close", "dep", "sync", "init"])
+          .default("ready"),
+        id: z.string().optional().describe("Bead issue ID (for claim, update, close, dep)"),
+        title: z.string().optional().describe("Issue title (for create)"),
+        type: z.enum(["task", "bug", "feature", "epic", "chore"]).optional().describe("Issue type (for create or list filter)"),
+        priority: z.number().int().min(0).max(4).optional().describe("Priority 0 (critical) to 4 (backlog)"),
+        description: z.string().optional().describe("Issue description (for create)"),
+        parent: z.string().optional().describe("Parent epic/issue ID (for create)"),
+        status: z.string().optional().describe("Status value (e.g. open, in_progress, blocked, closed)"),
+        assignee: z.string().optional().describe("Assignee name (for claim/update)"),
+        reason: z.string().optional().describe("Completion reason (for close)"),
+        blockerId: z.string().optional().describe("Blocking issue ID (for dep)"),
+        prefix: z.string().optional().describe("Custom short ID prefix (for init)"),
+        limit: z.number().int().min(1).max(200).optional().describe("Max issues to return (for list)"),
+        projectPath: z.string().optional().describe("Path to the project directory"),
+      },
+    },
+    async ({ action, id, title, type, priority, description, parent, status, assignee, reason, blockerId, prefix, limit, projectPath }) => {
+      try {
+        return jsonResult(
+          runBeadsAction(resolveDir(projectPath), {
+            action,
+            id,
+            title,
+            type,
+            priority,
+            description,
+            parent,
+            status,
+            assignee,
+            reason,
+            blockerId,
+            prefix,
+            limit,
+          }),
+        );
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "farmwork_just",
+    {
+      description:
+        "Inspect, run, or initialize the repository's maintained `justfile` (https://just.systems). Actions: 'list' (show all recipes + docs), 'run' (execute a named recipe), or 'init' (generate a stack-aware justfile).",
+      inputSchema: {
+        action: z.enum(["list", "run", "init"]).default("list"),
+        recipe: z.string().optional().describe("Recipe name to run (required for action='run')"),
+        args: z.array(z.string()).optional().describe("Optional positional args for the recipe"),
+        force: z.boolean().optional().describe("Overwrite existing justfile when action='init'"),
+        projectPath: z.string().optional().describe("Path to the project directory"),
+      },
+    },
+    async ({ action, recipe, args, force, projectPath }) => {
+      try {
+        const dir = resolveDir(projectPath);
+        if (action === "list") return jsonResult(detectJustfile(dir));
+        if (action === "init") return jsonResult(initJustfile(dir, { force: Boolean(force) }));
+        return jsonResult(runJustRecipe(dir, recipe, { args }));
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
+
   /* ------------------------------------------------------------------------
-     RESOURCES (Live read-only Markdown access)
+     RESOURCES (Live read-only Markdown & Justfile access)
      ------------------------------------------------------------------------ */
 
   const registerDocResource = (name, uri, description, relPath) => {
@@ -257,20 +336,31 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
   registerDocResource("compost", "farmwork://compost", "Retired ideas archive (_AUDIT/COMPOST.md)", "_AUDIT/COMPOST.md");
   registerDocResource("checklist", "farmwork://checklist", "Engineering standards checklist (_AUDIT/CHECKLIST.md)", "_AUDIT/CHECKLIST.md");
 
+  server.registerResource(
+    "justfile",
+    "farmwork://justfile",
+    { description: "Maintained repository justfile recipes", mimeType: "text/plain" },
+    async () => {
+      const found = findJustfile(baseCwd);
+      const text = found ? fs.readFileSync(found.fullPath, "utf8") : "# No justfile yet. Run `farmwork just --init` or `farmwork_just` (action: 'init').\n";
+      return { contents: [{ uri: "farmwork://justfile", mimeType: "text/plain", text }] };
+    },
+  );
+
   /* ------------------------------------------------------------------------
      PROMPTS (Cross-agent slash workflows without duplicated markdown files)
      ------------------------------------------------------------------------ */
 
   server.registerPrompt(
     "audit",
-    { description: "Run a deterministic Farmwork audit, tend the Idea Garden, and summarize project health." },
+    { description: "Run a deterministic Farmwork audit, check Beads ready work & Justfile recipes, and summarize project health." },
     () => ({
       messages: [
         {
           role: "user",
           content: {
             type: "text",
-            text: "Call `farmwork_audit` on this repository. Summarize the health score breakdown, flag any wilting or auto-composted ideas, and list the top 2–3 highest-leverage checklist or test gaps. Do not commit any changes.",
+            text: "Call `farmwork_audit` on this repository, plus `farmwork_beads` (`action: \"ready\"`) and `farmwork_just` (`action: \"list\"`). Summarize the health score breakdown, flag any wilting or auto-composted ideas, surface ready Beads tasks, verify `justfile` recipes match the repo's scripts, and list the top 2–3 highest-leverage gaps. Do not commit any changes.",
           },
         },
       ],
@@ -328,7 +418,7 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
   server.registerPrompt(
     "plan",
     {
-      description: "Research the codebase and save a structured plan in _PLANS/ before writing code.",
+      description: "Research the codebase, save a structured plan in _PLANS/, and optionally break tasks into Beads.",
       argsSchema: { feature: z.string().describe("Feature or idea to plan") },
     },
     ({ feature }) => ({
@@ -337,7 +427,7 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
           role: "user",
           content: {
             type: "text",
-            text: `Investigate the codebase for: "${feature}". Check \`farmwork_garden\` (\`action: "list"\`) in case this graduates an existing idea. Save a crisp, actionable plan using \`farmwork_plan\` (\`action: "create"\`) with overview, technical approach, files to modify, ordered steps, and verification risks. Show the saved plan path and ask for explicit confirmation before writing implementation code.`,
+            text: `Investigate the codebase for: "${feature}". Check \`farmwork_garden\` (\`action: "list"\`) in case this graduates an existing idea, and check \`farmwork_beads\` (\`action: "ready"\`) for related open work. Save a crisp, actionable plan using \`farmwork_plan\` (\`action: "create"\`) with overview, technical approach, files to modify, ordered steps, and verification risks. Offer to create linked Beads tasks via \`farmwork_beads\` (\`action: "create"\`) once confirmed, and ask for explicit confirmation before writing implementation code.`,
           },
         },
       ],
@@ -362,14 +452,14 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
 
   server.registerPrompt(
     "ship",
-    { description: "Verify quality gates, update checklist & audit metrics, and prepare a clean commit/push." },
+    { description: "Verify quality gates, update justfile/checklist/Beads & audit metrics, and prepare a clean commit/push." },
     () => ({
       messages: [
         {
           role: "user",
           content: {
             type: "text",
-            text: "Run `farmwork_gates` to verify lint, test, and build pass. Review `git diff` for stray debug logs or dead code (while preserving architectural 'why' comments). Check `farmwork_checklist` to see if any items were newly satisfied, run `farmwork_audit` to refresh _AUDIT/FARMHOUSE.md, and prepare a clean commit and push.",
+            text: "Run `farmwork_gates` to verify lint, test, build, and secrets security checks pass. Review `git diff` for stray debug logs or dead code (while preserving architectural 'why' comments). Confirm `justfile` recipes still match any added or changed scripts, close finished Beads issues (`farmwork_beads` `close` + `sync`), check `farmwork_checklist` for newly satisfied items, run `farmwork_audit` to refresh _AUDIT/FARMHOUSE.md, and prepare a clean commit and push.",
           },
         },
       ],

@@ -3,24 +3,26 @@
 import { program } from "commander";
 import { VERSION } from "../src/core.js";
 import { init } from "../src/init.js";
-import { status, audit, gates, security } from "../src/status.js";
+import { status, audit, gates, security, beadsCmd, justCmd } from "../src/status.js";
 import { doctor } from "../src/doctor.js";
 import { startMcpServer } from "../src/mcp.js";
 import { startViewer } from "../src/viewer.js";
 
 program
   .name("farmwork")
-  .description("Farmwork v3 — Agent-first standards, MCP server, and local Farm Viewer")
+  .description("Farmwork v3 — Agent-first standards, Beads, Justfile, MCP server, and local Farm Viewer")
   .version(VERSION);
 
 program
   .command("init")
-  .description("Initialize Farmwork v3 (.farmwork.json, AGENTS.md, .mcp.json, _AUDIT/, _PLANS/)")
-  .option("-f, --force", "Overwrite existing managed files (including GARDEN/CHECKLIST)")
+  .description("Initialize Farmwork v3 (.farmwork.json, AGENTS.md, .mcp.json, justfile, .beads/, _AUDIT/, _PLANS/)")
+  .option("-f, --force", "Overwrite existing managed files (including GARDEN/CHECKLIST/justfile)")
   .option("--reinstall", "Explicitly reinstall Farmwork v3 on a past v1/v2 Farmwork project")
   .option("--npx", "Write `npx -y farmwork mcp` into .mcp.json even if global `farmwork` v3 is installed")
   .option("-y, --yes", "Accept detected defaults without prompting")
   .option("--no-mcp", "Skip writing .mcp.json")
+  .option("--no-justfile", "Skip generating a starter justfile")
+  .option("--no-beads", "Skip initializing Beads (.beads/)")
   .action(init);
 
 program
@@ -65,6 +67,22 @@ program
   .option("--skip-deps", "Only run fast local secrets & tracked-file scan")
   .option("--json", "Output JSON")
   .action(security);
+
+program
+  .command("beads")
+  .description("Show Beads issue summary and ready unblocked work (or initialize .beads/)")
+  .option("--init", "Initialize Beads (.beads/) in this repository")
+  .option("--prefix <prefix>", "Custom issue ID prefix when using --init")
+  .option("--json", "Output JSON")
+  .action(beadsCmd);
+
+program
+  .command("just [recipe]")
+  .description("List maintained justfile recipes, run a recipe, or generate a starter justfile")
+  .option("--init", "Generate a stack-aware justfile")
+  .option("-f, --force", "Overwrite existing justfile when using --init")
+  .option("--json", "Output JSON")
+  .action(justCmd);
 
 program
   .command("doctor")
