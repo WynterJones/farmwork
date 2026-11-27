@@ -5,7 +5,7 @@
   "description": "Agent-first standards, MCP server, and local Farm Viewer for AI-assisted software projects",
   "main": "src/index.js",
   "bin": {
-    "farmwork": "./bin/farmwork.js"
+    "farmwork": "bin/farmwork.js"
   },
   "files": [
     "src",
@@ -48,7 +48,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/wynterjones/farmwork"
+    "url": "git+https://github.com/wynterjones/farmwork.git"
   },
   "homepage": "https://farmwork.dev"
 }
