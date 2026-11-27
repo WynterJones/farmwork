@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "farmwork": {
+      "command": "farmwork",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

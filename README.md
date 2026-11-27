@@ -62,13 +62,13 @@ Or in **Gemini CLI** (`~/.gemini/settings.json`) / **Codex** (`~/.codex/config.t
 | Tool | What It Does |
 |---|---|
 | `farmwork_status` | Deterministic health score (0–10), pillar scores, Beads summary, Justfile recipes, stack, test count, gates, checklist %, garden, plans, git state |
-| `farmwork_audit` | Age Idea Garden & refresh `_AUDIT/FARMHOUSE.md`, OR run/save lazy pillar audits (`security`, `performance`, `accessibility`, `code-quality`) |
-| `farmwork_gates` | Run detected `lint`, `test`, `build`, and local `security` secrets check, saving verified results |
-| `farmwork_beads` | Track project tasks & dependency graphs via [Beads](https://beads.gascity.com/) (`status`, `ready`, `list`, `create`, `claim`, `update`, `close`, `dep`, `sync`, `init`) |
+| `farmwork_audit` | Age Idea Garden, scan code/state-machine hotspots & refresh `_AUDIT/FARMHOUSE.md`, OR run/save lazy pillar audits (`security`, `performance`, `accessibility`, `code-quality`) |
+| `farmwork_gates` | Run detected `lint`, `test`, `build`, and local `security` secrets check, recording commit SHA so gates detect staleness |
+| `farmwork_beads` | **For agents:** granular task & dependency execution tracker via [Beads](https://beads.gascity.com/) (`status`, `ready`, `list`, `create`, `claim`, `update`, `close`, `dep`, `sync`, `init`) |
 | `farmwork_just` | Inspect, run, or generate a maintained [Justfile](https://just.systems/man/en/) (`list`, `run`, `init`) |
-| `farmwork_checklist` | Read or idempotently `complete`, `pending`, `skip`, or `add` items in `_AUDIT/CHECKLIST.md` |
+| `farmwork_checklist` | **For humans:** concise big-picture checklist (<=30 items: standards, big plans, future roadmap) with `list`, `complete`, `pending`, `skip`, `add`, and `link` (connects to Beads) |
 | `farmwork_garden` | `list`, `plant`, or `compost` pre-plan ideas in `_AUDIT/GARDEN.md` (lazily creates `_AUDIT/COMPOST.md`) |
-| `farmwork_plan` | `list`, `create` (graduates linked garden ideas), or `complete` plans in `_PLANS/` |
+| `farmwork_plan` | `list`, `create` (adds one concise big-plan item to `_AUDIT/CHECKLIST.md`), `to-beads` (breaks steps into granular Beads tasks & links the epic back to the checklist), or `complete` |
 
 ### 6 Live Resources
 - `farmwork://standards` — Universal agent engineering standards
@@ -80,6 +80,18 @@ Or in **Gemini CLI** (`~/.gemini/settings.json`) / **Codex** (`~/.codex/config.t
 
 ### 7 Workflow Prompts
 `audit`, `inspect`, `security`, `performance`, `plan`, `new-ideas`, and `ship` — exposed natively via MCP so you never copy-paste slash-command files across tools.
+
+---
+
+## Checklists vs. Beads (Humans vs. Agents)
+
+Farmwork keeps human planning and agent execution cleanly separated:
+
+- **Checklists (`_AUDIT/CHECKLIST.md`) are for humans** — concise big-picture standards, **big plans**, and **future plans** (`## Big Plans & Future Roadmap`, kept <=30 items so you can scan them at a glance).
+- **Beads (`.beads/`) is for agents** — granular task breakdowns, subtasks, blockers, and execution tracking (`bd ready` → claim → close → `bd sync`).
+- **Connected end-to-end:** Creating a plan adds one concise big-plan item to `_AUDIT/CHECKLIST.md`; running `to-beads` creates the Beads epic + granular child tasks and attaches ``(beads: `<epic-id>`)`` to that checklist item so you can jump straight from a big plan to its underlying agent work in Markdown or the Local Viewer. Closing that epic in Beads checks the big-plan item off automatically.
+- **Concise by enforcement:** `farmwork_checklist add` is refused once the checklist reaches its cap (default 30, `limits.maxChecklistItems` in `.farmwork.json`), and `farmwork doctor` flags bloat — granular work goes to Beads.
+- **Roadmap doesn't cost points:** Pending big plans are tracked separately (`Big Plans` in `farmwork status` / `FARMHOUSE.md`) and never lower the health score; only standards count.
 
 ---
 
@@ -129,12 +141,33 @@ Farmwork v3 **never auto-updates or modifies past Farmwork v1/v2 projects**.
 
 ---
 
-## What Changed in v3.0.0
+## What's New in v3.3.0
 
-- **Agent-First MCP Server:** Replaced static Claude-only `.claude/commands` & `.claude/agents` markdown prompts with a real MCP server (`farmwork mcp`) usable by Claude, Gemini, Codex, Cursor, and Antigravity.
-- **Local Farm Viewer (`farmwork view`):** Replaced hosted FarmFactory with a zero-database local viewer that reads and writes your `.md` files and checklists straight on disk.
-- **Removed unnecessary bloat:** Dropped `operator/`, legacy v1 phrase triggers, hardcoded `model: opus` prompts, destructive comment-stripping rules, and JS-only test counting.
-- **True Polyglot & Deterministic:** Auto-detects Node/TS, Ruby/Rails, Python, Rust, and Go, counts real test files across languages, and computes a transparent 0–10 health score.
+- **State Machine Auditing Built Into Audits:** `farmwork audit`, `farmwork doctor`, `farmwork_audit` (`code-quality`), and the Local Viewer now detect implicit state machines (boolean flag explosions like `isLoading`/`isSaving`/`isError`, loose status string mutations without transition guards) and recommend **native language constructs first** (TS discriminated unions, Rails `enum` + guarded transitions, Rust/Python/Go enums) — no state-machine library required.
+- **Anti-Rot & Context Hygiene:** Flags oversized monolith files (>700 lines), stray debug breakpoints, bloated or stale `AGENTS.md` files (broken file paths or >180 lines), and `justfile` recipe drift against configured gates.
+- **Honest Gate Staleness:** `farmwork gates` records the verified commit SHA; landing new code commits without re-running gates decays the quality-gate health score until re-verified.
+- **Plan → Beads Graduation:** Turn any `_PLANS/*.md` spec into a Beads epic + child tasks with one click or `farmwork_plan` (`action: "to-beads"`).
+- **Hardened & Modular Architecture:** Split `src/core/` and `src/viewer/` into focused modules (<650 lines each), added strict CSP + CSRF `Origin` checks and WebP asset caching to the Local Viewer, and upgraded WCAG 2.1 AA semantics and keyboard focus.
+
+---
+
+## Local Development & Architecture
+
+```bash
+git clone https://github.com/wynterjones/farmwork.git
+cd farmwork
+npm install
+npm run lint     # Syntax check + state-machine/monolith/debug hygiene scan
+npm test         # Run node:test suite across core, MCP, scanners, Beads/Just, and Viewer
+npm run build    # Verify package version, CLI entrypoint, and WebP assets
+just check       # Run all gates via maintained justfile
+```
+
+Architecture layout:
+- `bin/farmwork.js` — CLI entrypoint (`init`, `mcp`, `view`, `status`, `audit`, `gates`, `security`, `beads`, `just`, `doctor`)
+- `src/core/` — Modular engine (`shared`, `detect`, `checklist`, `markdown`, `tooling`, `scanners`, `audit`, `init`) re-exported via `src/core.js`
+- `src/viewer/` — Zero-dependency Local Farm Viewer (HTTP server in `src/viewer.js`, styles, explicit client route state machine, accessible views/tabs)
+- `src/mcp.js` — Stdio MCP server exposing 8 deterministic tools, 6 live resources, and 7 workflow prompts
 
 ---
 

@@ -3,3 +3,8 @@ node_modules/
 .farmwork/
 .claude/settings.local.json
 outputs/
+.env
+.env.*
+!.env.example
+*.pem
+*.key

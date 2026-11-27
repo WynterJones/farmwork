@@ -1,6 +1,6 @@
 {
   "name": "farmwork",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "type": "module",
   "description": "Agent-first standards, MCP server, and local Farm Viewer for AI-assisted software projects",
   "main": "src/index.js",
@@ -14,7 +14,9 @@
     "README.md"
   ],
   "scripts": {
+    "lint": "node scripts/lint.js",
     "test": "node --test test/*.test.js",
+    "build": "node scripts/verify-build.js",
     "mcp": "node ./bin/farmwork.js mcp",
     "view": "node ./bin/farmwork.js view"
   },

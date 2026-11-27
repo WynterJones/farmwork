@@ -1,0 +1,24 @@
+{
+  "version": "3.3.0",
+  "name": "farmwork",
+  "stack": "mcp-node",
+  "packageManager": "npm",
+  "commands": {
+    "test": "npm run test",
+    "build": "npm run build",
+    "lint": "npm run lint"
+  },
+  "lastGates": {
+    "date": "2026-11-27",
+    "commitSha": "13e424f",
+    "allPassed": true,
+    "ranCount": 4,
+    "passedCount": 4,
+    "gates": {
+      "lint": "passed",
+      "test": "passed",
+      "build": "passed",
+      "security": "passed"
+    }
+  }
+}

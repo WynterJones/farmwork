@@ -1,12 +1,14 @@
-import { VERSION, computeHealth } from "./core.js";
+import { VERSION, computeHealth, runCodeQualityScan } from "./core.js";
 import { farmTerm } from "./terminal.js";
 
 export async function doctor(options = {}) {
   const cwd = process.cwd();
   const health = computeHealth(cwd);
+  const codeQuality = runCodeQualityScan(cwd, { skipDeadCode: true });
   const isLegacy = Boolean(health.install?.isLegacy);
   const legacyList = (health.install?.legacyFiles || []).filter((f) => !f.startsWith(".farmwork.json"));
   const repairCmd = isLegacy ? "Run `farmwork init --reinstall`" : "Run `farmwork init`";
+  const hygiene = health.contextHygiene;
 
   const checks = [
     {
@@ -34,6 +36,28 @@ export async function doctor(options = {}) {
         : "Install `bd` from https://beads.gascity.com/ then run `bd init`",
     },
     {
+      label: "Context, checklist conciseness & justfile hygiene (no AGENTS.md bloat, checklist >30, or drift)",
+      passed: Boolean(hygiene?.clean),
+      fix: hygiene?.issues?.map((i) => i.detail).join("; ") || "",
+    },
+    {
+      label: "Code & state-machine hygiene (no monoliths, flag explosions, or debug breakpoints)",
+      passed: codeQuality.clean,
+      fix: [
+        codeQuality.oversizedFiles.length
+          ? `${codeQuality.oversizedFiles.length} oversized file(s): ${codeQuality.oversizedFiles.slice(0, 3).map((f) => `${f.file} (${f.lines}L)`).join(", ")}`
+          : null,
+        codeQuality.stateMachineHotspots.length
+          ? `${codeQuality.stateMachineHotspots.length} state hotspot(s): ${codeQuality.stateMachineHotspots.slice(0, 3).map((h) => h.file).join(", ")}`
+          : null,
+        codeQuality.debugNoise.length
+          ? `${codeQuality.debugNoise.length} debug breakpoint(s)`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    },
+    {
       label: "Automated test files detected",
       passed: health.metrics.testFiles > 0,
       fix: `Add tests for stack "${health.stack}"`,
@@ -49,7 +73,13 @@ export async function doctor(options = {}) {
   const failed = checks.length - passed;
 
   if (options.json) {
-    console.log(JSON.stringify({ projectName: health.projectName, install: health.install, passed, failed, checks }, null, 2));
+    console.log(
+      JSON.stringify(
+        { projectName: health.projectName, install: health.install, passed, failed, checks, codeQuality, contextHygiene: hygiene },
+        null,
+        2,
+      ),
+    );
     return;
   }
 

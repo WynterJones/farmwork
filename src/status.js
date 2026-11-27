@@ -41,6 +41,7 @@ export async function status(options = {}) {
   farmTerm.kv("Git", health.git.isGitRepo ? `${health.git.branch} (${health.git.dirtyCount} uncommitted)` : "not a git repo");
   farmTerm.kv("Test Files", String(health.metrics.testFiles));
   farmTerm.kv("Checklist", `${health.metrics.checklistPercent}% (${health.metrics.checklistCompleted}/${health.metrics.checklistActive})`);
+  farmTerm.kv("Big Plans", `${health.metrics.bigPlansCompleted}/${health.metrics.bigPlans} done`);
   farmTerm.kv("Plans", `${health.metrics.completedPlans}/${health.metrics.totalPlans} complete`);
   farmTerm.kv("Idea Garden", `${health.metrics.activeIdeas} active (${health.metrics.wiltingIdeas} wilting), ${health.metrics.compostedIdeas} composted`);
   farmTerm.kv(
@@ -101,6 +102,21 @@ export async function audit(options = {}) {
   }
   if (result.gardenResult.autoComposted.length > 0) {
     farmTerm.warn(`Auto-composted (>60d): ${result.gardenResult.autoComposted.join(", ")}`);
+  }
+  if (result.codeQuality && !result.codeQuality.clean) {
+    farmTerm.section("State & Code Hygiene Signals");
+    for (const f of result.codeQuality.oversizedFiles) {
+      farmTerm.warn(`Oversized file: ${f.file} (${f.lines} lines > ${f.limit})`);
+    }
+    for (const h of result.codeQuality.stateMachineHotspots) {
+      farmTerm.warn(`State machine hotspot [${h.severity}]: ${h.file} — ${h.detail}`);
+    }
+    for (const d of result.codeQuality.debugNoise) {
+      farmTerm.warn(`Debug noise: ${d.file}:${d.line} (${d.type})`);
+    }
+    if (result.codeQuality.stateMachineHotspots.length > 0) {
+      farmTerm.dim(`Tip: ${result.codeQuality.stateRecommendation}`);
+    }
   }
   console.log("");
 }

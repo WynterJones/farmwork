@@ -11,6 +11,7 @@ import {
   runAudit,
   runGates,
   runSecurityScan,
+  runCodeQualityScan,
   savePillarAudit,
   parseGarden,
   parseCompost,
@@ -19,9 +20,12 @@ import {
   listPlans,
   createPlan,
   completePlan,
+  graduatePlanToBeads,
   parseChecklist,
   setChecklistItem,
   addChecklistItem,
+  linkChecklistItem,
+  BIG_PLANS_GROUP,
   findJustfile,
   detectJustfile,
   initJustfile,
@@ -77,7 +81,7 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
     "farmwork_audit",
     {
       description:
-        "Run a deterministic Farmwork audit (default: ages Idea Garden and refreshes _AUDIT/FARMHOUSE.md). Optionally pass `pillar` ('security' | 'performance' | 'accessibility' | 'code-quality') to save a structured lazy pillar report to _AUDIT/<PILLAR>.md (or run a deterministic security scan when pillar='security' without a score). Never modifies legacy v1/v2 repos.",
+        "Run a deterministic Farmwork audit (default: ages Idea Garden, checks state-machine/monolith hotspots, and refreshes _AUDIT/FARMHOUSE.md). Pass `pillar` ('security' | 'performance' | 'accessibility' | 'code-quality') with `score` to save a lazy pillar report to _AUDIT/<PILLAR>.md, or omit `score` with pillar='security' (secrets/CVE scan) or pillar='code-quality' (oversized files, implicit state machines, debug breakpoints, dead code). Never modifies legacy v1/v2 repos.",
       inputSchema: {
         projectPath: z.string().optional().describe("Path to the project directory (defaults to server cwd)"),
         pillar: z
@@ -108,11 +112,14 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
         if (pillar) {
           if (typeof score === "number") {
             const saved = savePillarAudit(dir, { pillar, score, status, summary, findings, recommendations });
-            return jsonResult({ saved, securityScan: pillar === "security" ? runSecurityScan(dir) : undefined });
+            return jsonResult({
+              saved,
+              securityScan: pillar === "security" ? runSecurityScan(dir) : undefined,
+              codeQualityScan: pillar === "code-quality" ? runCodeQualityScan(dir, { skipDeadCode: true }) : undefined,
+            });
           }
-          if (pillar === "security") {
-            return jsonResult(runSecurityScan(dir));
-          }
+          if (pillar === "security") return jsonResult(runSecurityScan(dir));
+          if (pillar === "code-quality") return jsonResult(runCodeQualityScan(dir, { skipDeadCode: false }));
           return errorResult(`Provide a numeric \`score\` (0-10) to save a "${pillar}" pillar audit.`);
         }
         return jsonResult(runAudit(dir));
@@ -148,24 +155,44 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
     "farmwork_checklist",
     {
       description:
-        "Read or update _AUDIT/CHECKLIST.md. Actions: 'list', 'complete', 'pending', 'skip' (removes from denominator), or 'add'.",
+        "Manage the human-facing big-picture checklist (_AUDIT/CHECKLIST.md): engineering standards, 'big plans', and future roadmap items. Concise by design: 'add' is refused once the checklist hits its cap (default 30, `limits.maxChecklistItems`). NEVER add granular task breakdowns here (put agent tasks in `farmwork_beads` and connect them via `beadsId`). When the user says 'big plan' or describes a future plan, add ONE item here. Big plans don't count against the health score. Actions: 'list', 'complete', 'pending', 'skip', 'add' (defaults to 'Big Plans & Future Roadmap'), or 'link' (attach a Beads epic/issue ID or plan path).",
       inputSchema: {
-        action: z.enum(["list", "complete", "pending", "skip", "add"]).default("list"),
+        action: z.enum(["list", "complete", "pending", "skip", "add", "link"]).default("list"),
         target: z
           .union([z.number(), z.string()])
           .optional()
-          .describe("Item numeric ID or title match (for complete/pending/skip)"),
-        title: z.string().optional().describe("New checklist item text (for action='add')"),
-        group: z.string().optional().describe("Section heading for new item (for action='add')"),
+          .describe("Item numeric ID, title match, plan path, or Beads ID (for complete/pending/skip/link)"),
+        title: z.string().optional().describe("Concise big-plan or standard text (for action='add')"),
+        group: z
+          .string()
+          .optional()
+          .describe("Section heading for new item (defaults to 'Big Plans & Future Roadmap')"),
+        beadsId: z
+          .string()
+          .optional()
+          .describe("Optional related Beads epic/issue ID so humans can follow a big plan to agent tasks"),
+        planPath: z.string().optional().describe("Optional linked plan path such as '_PLANS/MY_PLAN.md'"),
         projectPath: z.string().optional().describe("Path to the project directory"),
       },
     },
-    async ({ action, target, title, group, projectPath }) => {
+    async ({ action, target, title, group, beadsId, planPath, projectPath }) => {
       try {
         const dir = resolveDir(projectPath);
         if (action === "list") return jsonResult(parseChecklist(dir));
-        if (action === "add") return jsonResult(addChecklistItem(dir, { group: group || "Project Standards", title }));
-        return jsonResult(setChecklistItem(dir, { target, state: action }));
+        if (action === "add") {
+          return jsonResult(
+            addChecklistItem(dir, {
+              group: group || BIG_PLANS_GROUP,
+              title,
+              beadsId: beadsId || null,
+              planPath: planPath || null,
+            }),
+          );
+        }
+        if (action === "link") {
+          return jsonResult(linkChecklistItem(dir, { target, beadsId, planPath }));
+        }
+        return jsonResult(setChecklistItem(dir, { target, state: action, beadsId, planPath }));
       } catch (err) {
         return errorResult(err);
       }
@@ -206,26 +233,35 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
     "farmwork_plan",
     {
       description:
-        "Manage implementation plans in _PLANS/. Actions: 'list', 'create' (saves _PLANS/<SLUG>.md and graduates matching GARDEN.md idea), or 'complete' (marks Complete and logs in GARDEN.md).",
+        "Manage big-picture implementation plans in _PLANS/. Actions: 'list', 'create' (saves _PLANS/<SLUG>.md, graduates matching GARDEN.md idea, and adds one concise item to _AUDIT/CHECKLIST.md under 'Big Plans & Future Roadmap'), 'to-beads' (idempotently creates a Beads epic + granular child tasks for agents and links the epic ID back to the checklist item), or 'complete' (marks both the plan and its linked checklist item Complete).",
       inputSchema: {
-        action: z.enum(["list", "create", "complete"]).default("list"),
+        action: z.enum(["list", "create", "complete", "to-beads"]).default("list"),
         title: z.string().optional().describe("Plan title (for create)"),
-        plan: z.string().optional().describe("Plan slug, filename, or title (for complete)"),
+        plan: z.string().optional().describe("Plan slug, filename, or title (for complete or to-beads)"),
         summary: z.string().optional().describe("Problem statement and goal (for create)"),
         approach: z.string().optional().describe("Technical architecture and tradeoffs (for create)"),
         files: z.array(z.string()).optional().describe("Files expected to be modified (for create)"),
         steps: z.array(z.string()).optional().describe("Ordered implementation steps (for create)"),
         risks: z.array(z.string()).optional().describe("Key risks and verification criteria (for create)"),
         fromIdea: z.string().optional().describe("Optional GARDEN.md idea title being graduated (for create)"),
+        addToChecklist: z
+          .boolean()
+          .optional()
+          .describe("Add a concise big-plan item to _AUDIT/CHECKLIST.md (default: true)"),
         projectPath: z.string().optional().describe("Path to the project directory"),
       },
     },
-    async ({ action, title, plan, summary, approach, files, steps, risks, fromIdea, projectPath }) => {
+    async ({ action, title, plan, summary, approach, files, steps, risks, fromIdea, addToChecklist, projectPath }) => {
       try {
         const dir = resolveDir(projectPath);
         if (action === "list") return jsonResult({ plans: listPlans(dir) });
         if (action === "create") {
-          return jsonResult(createPlan(dir, { title, summary, approach, files, steps, risks, fromIdea }));
+          return jsonResult(
+            createPlan(dir, { title, summary, approach, files, steps, risks, fromIdea, addToChecklist }),
+          );
+        }
+        if (action === "to-beads") {
+          return jsonResult(graduatePlanToBeads(dir, plan || title));
         }
         return jsonResult(completePlan(dir, plan || title));
       } catch (err) {
@@ -238,7 +274,7 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
     "farmwork_beads",
     {
       description:
-        "Track project issues & dependency graphs via Beads (`bd`). Actions: 'status', 'ready' (unblocked next work), 'list', 'create', 'claim' (set in_progress), 'update', 'close', 'dep' (add blocker), 'sync', or 'init'.",
+        "Agent-facing granular task & dependency execution tracker via Beads (`bd`). Use Beads for all detailed task breakdowns, subtasks, blockers, and execution progress (keep _AUDIT/CHECKLIST.md concise for humans and link top-level epics via `farmwork_checklist` action='link'). Closing an epic linked from the checklist (`beads: <id>`) checks off that big-plan item automatically. Actions: 'status', 'ready', 'list', 'create', 'claim', 'update', 'close', 'dep', 'sync', or 'init'.",
       inputSchema: {
         action: z
           .enum(["status", "ready", "list", "create", "claim", "update", "close", "dep", "sync", "init"])
@@ -353,14 +389,14 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
 
   server.registerPrompt(
     "audit",
-    { description: "Run a deterministic Farmwork audit, check Beads ready work & Justfile recipes, and summarize project health." },
+    { description: "Run a deterministic Farmwork audit, check state-machine/monolith hotspots, checklist conciseness, Beads ready work, and Justfile alignment." },
     () => ({
       messages: [
         {
           role: "user",
           content: {
             type: "text",
-            text: "Call `farmwork_audit` on this repository, plus `farmwork_beads` (`action: \"ready\"`) and `farmwork_just` (`action: \"list\"`). Summarize the health score breakdown, flag any wilting or auto-composted ideas, surface ready Beads tasks, verify `justfile` recipes match the repo's scripts, and list the top 2–3 highest-leverage gaps. Do not commit any changes.",
+            text: "Call `farmwork_audit`, `farmwork_beads` (`action: \"ready\"`), and `farmwork_just` (`action: \"list\"`). Summarize the health score breakdown (flagging stale gates, bloated checklists >30 items that belong in Beads, or context drift), surface oversized files or implicit state-machine hotspots (boolean flag clusters or loose status mutations), list ready Beads tasks, verify `justfile` matches configured scripts, and highlight the top 2–3 highest-leverage improvements. Do not commit any changes.",
           },
         },
       ],
@@ -369,14 +405,14 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
 
   server.registerPrompt(
     "inspect",
-    { description: "Deep review: run quality gates + security scan, review security/performance/accessibility, and optionally persist pillar scores." },
+    { description: "Deep review: run quality gates, security scan, and code-quality/state-machine audit across the codebase." },
     () => ({
       messages: [
         {
           role: "user",
           content: {
             type: "text",
-            text: "Run `farmwork_status`, `farmwork_gates`, and `farmwork_audit` with `pillar: \"security\"`. Then perform a thorough read-only code review covering Security (OWASP), Performance, Accessibility, and Code Quality. Report findings by severity (CRITICAL / HIGH / MEDIUM / LOW) with exact file:line references and concrete fixes, and offer to save any pillar report via `farmwork_audit` (`pillar`, `score`, `findings`).",
+            text: "Run `farmwork_status`, `farmwork_gates`, `farmwork_audit` (`pillar: \"security\"`), and `farmwork_audit` (`pillar: \"code-quality\"`). Perform a thorough read-only review covering Security (OWASP), Performance, Accessibility, and Code Quality — specifically auditing explicit and implicit state machines (boolean flag explosions, loose status strings mutated across files, impossible state combinations, missing transition guards). Recommend native language tools first (e.g. TypeScript discriminated unions, Rails enums + guarded methods, Rust/Python/Go enums) rather than requiring a state-machine library. Report findings by severity (CRITICAL / HIGH / MEDIUM / LOW) with file:line references and offer to save pillar reports via `farmwork_audit`.",
           },
         },
       ],
@@ -418,8 +454,8 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
   server.registerPrompt(
     "plan",
     {
-      description: "Research the codebase, save a structured plan in _PLANS/, and optionally break tasks into Beads.",
-      argsSchema: { feature: z.string().describe("Feature or idea to plan") },
+      description: "Research the codebase, record a big plan in _PLANS/ + concise checklist item, and break granular tasks into Beads.",
+      argsSchema: { feature: z.string().describe("Big plan or feature to plan") },
     },
     ({ feature }) => ({
       messages: [
@@ -427,7 +463,7 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
           role: "user",
           content: {
             type: "text",
-            text: `Investigate the codebase for: "${feature}". Check \`farmwork_garden\` (\`action: "list"\`) in case this graduates an existing idea, and check \`farmwork_beads\` (\`action: "ready"\`) for related open work. Save a crisp, actionable plan using \`farmwork_plan\` (\`action: "create"\`) with overview, technical approach, files to modify, ordered steps, and verification risks. Offer to create linked Beads tasks via \`farmwork_beads\` (\`action: "create"\`) once confirmed, and ask for explicit confirmation before writing implementation code.`,
+            text: `Investigate the codebase for: "${feature}". Check \`farmwork_garden\` (\`action: "list"\`), \`farmwork_checklist\` (\`action: "list"\`), and \`farmwork_beads\` (\`action: "ready"\`). Save a crisp plan using \`farmwork_plan\` (\`action: "create"\`) — this automatically adds ONE concise big-plan item to \`_AUDIT/CHECKLIST.md\` (\`Big Plans & Future Roadmap\`) for humans. NEVER add granular subtasks to the checklist; once confirmed, run \`farmwork_plan\` (\`action: "to-beads"\`) so all granular execution tasks live in Beads linked to the checklist item. Ask for explicit confirmation before editing implementation code.`,
           },
         },
       ],
@@ -452,14 +488,14 @@ export function createFarmworkMcpServer(defaultCwd = process.cwd()) {
 
   server.registerPrompt(
     "ship",
-    { description: "Verify quality gates, update justfile/checklist/Beads & audit metrics, and prepare a clean commit/push." },
+    { description: "Verify quality gates, close/sync agent Beads tasks, check off human big-plan checklist items, and prepare a clean commit/push." },
     () => ({
       messages: [
         {
           role: "user",
           content: {
             type: "text",
-            text: "Run `farmwork_gates` to verify lint, test, build, and secrets security checks pass. Review `git diff` for stray debug logs or dead code (while preserving architectural 'why' comments). Confirm `justfile` recipes still match any added or changed scripts, close finished Beads issues (`farmwork_beads` `close` + `sync`), check `farmwork_checklist` for newly satisfied items, run `farmwork_audit` to refresh _AUDIT/FARMHOUSE.md, and prepare a clean commit and push.",
+            text: "Run `farmwork_gates` to verify lint, test, build, and secrets security checks pass. Review `git diff` for stray debug logs or dead code (while preserving architectural 'why' comments). Confirm `justfile` recipes still match any added or changed scripts, close finished granular agent tasks in Beads (`farmwork_beads` `close` + `sync`), check off any newly satisfied big-picture items in `_AUDIT/CHECKLIST.md` (`farmwork_checklist`), run `farmwork_audit` to refresh _AUDIT/FARMHOUSE.md, and prepare a clean commit and push.",
           },
         },
       ],
